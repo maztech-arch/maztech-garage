@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>รายละเอียดงานซ่อม — Maztech Garage</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="assets/mock-data.js"></script>
+  <script src="assets/app.js"></script>
+</head>
+<body>
+
+<div class="app-shell" id="app"></div>
+
+<script>
+/* ============================================================
+   job-detail.js — inline page script
+   ============================================================ */
+
+(async () => {
+  // Read job ID from URL (?id=MT-2504-0041)
+  const params = new URLSearchParams(window.location.search);
+  const jobId  = params.get('id') || 'MT-2504-0041';
+
+  const job = await MockData.getJobDetail(jobId);
+  const fin = calcFinancials(job.financials, job.parts);
+
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('jobs')}
+    <div class="main-area">
+      ${renderTopbar([
+        { label: 'งานซ่อม', href: 'jobs.html' },
+        { label: job.id,      href: 'jobs.html' },
+        { label: 'รายละเอียด' }
+      ])}
+      <main class="page-content" style="flex-direction:row;gap:14px;overflow:hidden;">
+        <div class="detail-main" style="overflow-y:auto;">
+          ${renderJobHeader(job)}
+          ${renderCustomerSection(job)}
+          ${renderSymptomsSection(job)}
+          ${renderPartsSection(job)}
+          ${renderFinancialsAndHistory(job, fin)}
+        </div>
+        ${renderRightRail(job, fin)}
+      </main>
+    </div>`;
+
+})();
+
+// ── Job Header ────────────────────────────────────────────────
+function renderJobHeader(job) {
+  return `
+    <div class="page-header">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:18px;font-weight:700;color:var(--heading);">${job.id}</span>
+          ${jobStatusBadge[job.jobStatus] || ''}
+          ${payStatusBadge[job.payStatus] || ''}
+        </div>
+        <div class="page-sub" style="margin-top:5px;">
+          เปิดจ๊อบ: ${job.openDate} &nbsp;·&nbsp; นัดรับ: ${job.appointDate} &nbsp;·&nbsp; ผ่านมา ${job.daysOpen} วัน
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-warn"   >เปลี่ยนสถานะ</button>
+        <button class="btn btn-outline">🖨 เอกสาร</button>
+        <button class="btn btn-primary">💰 บันทึกรับชำระ</button>
+      </div>
+    </div>`;
+}
+
+// ── Customer & Vehicle Section ────────────────────────────────
+function renderCustomerSection(job) {
+  const c = job.customer;
+  const v = job.vehicle;
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon" style="background:#dbeafe;">👤</div>
+          ข้อมูลลูกค้าและรถ
+        </div>
+        <button class="btn btn-outline btn-sm">แก้ไข</button>
+      </div>
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">ชื่อลูกค้า</span>
+            <span class="info-val">${c.name}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">เบอร์โทร</span>
+            <span class="info-val">${c.phone}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">LINE / ช่องทางติดต่อ</span>
+            <span class="info-val">${c.line}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">ประเภทลูกค้า</span>
+            <span class="info-val">${jobStatusBadge['ตรวจซ้ำ'] ? `<span class="badge badge-purple">${c.type}</span>` : c.type}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">ทะเบียนรถ</span>
+            <span class="info-val mono">${v.plate}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">รุ่นรถ</span>
+            <span class="info-val">${v.model}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">เลขไมล์</span>
+            <span class="info-val">${fmt.number(v.mileage)} กม.</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">สีรถ</span>
+            <span class="info-val">${v.color}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">VIN / หมายเลขตัวถัง</span>
+            <span class="info-val" style="font-family:monospace;font-size:11px;">${v.vin}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">เจ้าของ</span>
+            <span class="info-val">${v.owner}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Symptoms Section ──────────────────────────────────────────
+function renderSymptomsSection(job) {
+  const s = job.symptoms;
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon" style="background:#fef3c7;">🔧</div>
+          อาการรถและรายละเอียดงาน
+        </div>
+        <button class="btn btn-outline btn-sm">+ เพิ่มหมายเหตุ</button>
+      </div>
+      <div class="card-body">
+        <div class="symptom-box">
+          <div class="symptom-label">อาการที่ลูกค้าแจ้ง</div>
+          <div class="symptom-text">${s.customer}</div>
+        </div>
+        <div class="symptom-box">
+          <div class="symptom-label">ผลตรวจเช็กจากช่าง</div>
+          <div class="symptom-text">${s.tech}</div>
+        </div>
+        <div class="symptom-box">
+          <div class="symptom-label">หมายเหตุภายใน (ลูกค้าไม่เห็น)</div>
+          <div class="symptom-text">${s.internal}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Parts Section ─────────────────────────────────────────────
+function renderPartsSection(job) {
+  const rows = job.parts.map(p => {
+    const g = calcGP(p.costUnit, p.sellUnit, p.qty);
+    return `
+      <tr>
+        <td class="font-mono" style="font-size:10px;">${p.partNo}</td>
+        <td>${p.name}</td>
+        <td>${partTypePill[p.type] || p.type}</td>
+        <td class="text-right">${fmt.number(p.qty)}</td>
+        <td class="text-right">${p.costUnit > 0 ? fmt.baht(p.costUnit) : '—'}</td>
+        <td class="text-right">${fmt.baht(p.sellUnit)}</td>
+        <td class="text-right">${g.cost > 0 ? fmt.baht(g.cost) : '—'}</td>
+        <td class="text-right">${fmt.baht(g.sell)}</td>
+        <td class="text-right gp-positive">${fmt.percent(g.gpPct)}</td>
+        <td>${p.supplier}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="card table-wrap">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon" style="background:#d1fae5;">📦</div>
+          รายการอะไหล่
+        </div>
+        <button class="btn btn-primary btn-sm">+ เพิ่มอะไหล่</button>
+      </div>
+      <table class="parts-table">
+        <thead>
+          <tr>
+            <th>Part No</th><th>รายการอะไหล่</th><th>ประเภท</th>
+            <th>จำนวน</th><th>ต้นทุน/หน่วย</th><th>ขาย/หน่วย</th>
+            <th>รวมต้นทุน</th><th>รวมขาย</th><th>GP%</th><th>Supplier</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Financials + History (2-col grid) ────────────────────────
+function renderFinancialsAndHistory(job, fin) {
+  const f = job.financials;
+
+  const historyRows = job.history.map(h => `
+    <tr>
+      <td><a href="job-detail.html?id=${h.jobId}" class="job-no">${h.jobId}</a></td>
+      <td>${h.date}</td>
+      <td>${h.work}</td>
+      <td>${fmt.baht(h.amount)}</td>
+      <td><span class="badge badge-green">เสร็จ</span></td>
+    </tr>`).join('');
+
+  return `
+    <div class="two-col-grid">
+      <!-- Financials -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background:#ede9fe;">💳</div>
+            สรุปค่าใช้จ่าย
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="fin-section">
+            <div class="fin-row">
+              <span class="fin-key">อะไหล่รวม</span>
+              <span class="fin-val">${fmt.baht(fin.partsTotal)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key">ค่าแรงช่าง</span>
+              <span class="fin-val">${fmt.baht(f.laborMain)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key">ค่าบริการพิเศษ</span>
+              <span class="fin-val">${fmt.baht(f.specialService)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key">ส่วนลด VIP</span>
+              <span class="fin-val positive">- ${fmt.baht(f.discount)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key">VAT ${(f.vatRate * 100).toFixed(0)}%</span>
+              <span class="fin-val">${fmt.baht(fin.vat)}</span>
+            </div>
+            <div class="fin-row" style="border-top:1px solid #e8edf2;padding-top:8px;margin-top:4px;">
+              <span class="fin-key" style="font-weight:600;color:var(--heading);">ยอดรวมสุทธิ</span>
+              <span class="fin-val total">${fmt.baht(fin.grand)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key">ยอดมัดจำรับแล้ว</span>
+              <span class="fin-val positive">- ${fmt.baht(f.deposit)}</span>
+            </div>
+            <div class="fin-row">
+              <span class="fin-key remaining">คงเหลือที่ต้องชำระ</span>
+              <span class="fin-val remaining">${fmt.baht(fin.remaining)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card table-wrap">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background:#ccfbf1;">📋</div>
+            ประวัติซ่อมย้อนหลัง
+          </div>
+        </div>
+        <table class="history-table">
+          <thead>
+            <tr><th>Job No</th><th>วันที่</th><th>งานที่ทำ</th><th>ยอด</th><th>สถานะ</th></tr>
+          </thead>
+          <tbody>${historyRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── Right Rail ────────────────────────────────────────────────
+function renderRightRail(job, fin) {
+  const timelineHtml = job.timeline.map((t, i) => {
+    const isLast  = i === job.timeline.length - 1;
+    const connCls = t.status === 'done' ? 'done' : 'pending';
+    const stepCls = t.status;
+    const prefix  = t.status === 'done' ? '✓ ' : t.status === 'active' ? '● ' : '';
+    return `
+      <div class="tl-item">
+        <div class="tl-line">
+          <div class="tl-dot ${t.status}"></div>
+          ${!isLast ? `<div class="tl-connector ${connCls}"></div>` : ''}
+        </div>
+        <div class="tl-content${isLast ? ' mb-0' : ''}">
+          <div class="tl-step ${stepCls}">${prefix}${t.step}</div>
+          <div class="tl-time">${t.time}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="right-rail" style="overflow-y:auto;">
+
+      <!-- Status Timeline -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📍 สถานะปัจจุบัน</div>
+        </div>
+        <div class="card-body">
+          <div class="timeline">${timelineHtml}</div>
+        </div>
+      </div>
+
+      <!-- Assignee Info -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">👷 ผู้รับผิดชอบ</div>
+        </div>
+        <div class="card-body" style="padding:10px 16px;">
+          <div class="rail-row">
+            <span class="rail-key">ผู้เปิดจ๊อบ</span>
+            <span class="rail-val">${job.assignee}</span>
+          </div>
+          <div class="rail-row">
+            <span class="rail-key">ช่างหลัก</span>
+            <span class="rail-val">${job.technician}</span>
+          </div>
+          <div class="rail-row">
+            <span class="rail-key">นัดรับรถ</span>
+            <span class="rail-val text-red">${job.appointDate}</span>
+          </div>
+          <div class="rail-row">
+            <span class="rail-key">ความเร่งด่วน</span>
+            <span class="rail-val">${renderUrgencyStars(job.urgency)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚡ Actions</div>
+        </div>
+        <div class="card-body">
+          <div class="action-grid">
+            <button class="action-btn primary">แก้ไขข้อมูล</button>
+            <button class="action-btn warn">เปลี่ยนสถานะ</button>
+            <button class="action-btn">🖨 ใบรับรถ</button>
+            <button class="action-btn">🖨 ใบเสนอราคา</button>
+            <button class="action-btn">🖨 ใบเสร็จ</button>
+            <button class="action-btn">🖨 ใบส่งมอบ</button>
+            <button class="action-btn success">💰 รับชำระ</button>
+            <button class="action-btn">+ อะไหล่</button>
+            <button class="action-btn">+ หมายเหตุ</button>
+            <button class="action-btn">📷 อัปโหลดรูป</button>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+}
+</script>
+</body>
+</html>

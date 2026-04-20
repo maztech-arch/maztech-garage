@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>งานซ่อมทั้งหมด — Maztech Garage</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="assets/mock-data.js"></script>
+  <script src="assets/app.js"></script>
+</head>
+<body>
+
+<div class="app-shell" id="app"></div>
+
+<script>
+/* ============================================================
+   jobs.js — inline page script
+   ============================================================ */
+
+(async () => {
+  const [summary, allJobs] = await Promise.all([
+    MockData.getJobSummary(),
+    MockData.getJobs(),
+  ]);
+
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('jobs')}
+    <div class="main-area">
+      ${renderTopbar([
+        { label: 'Maztech Garage', href: 'dashboard.html' },
+        { label: 'งานซ่อมทั้งหมด' }
+      ])}
+      <main class="page-content">
+        ${renderPageHeader()}
+        ${renderFilterPanel()}
+        ${renderSummaryStrip(summary)}
+        ${renderJobsTable(allJobs)}
+      </main>
+    </div>`;
+
+  // Wire up filter clear button
+  document.getElementById('clear-filters').addEventListener('click', clearFilters);
+
+})();
+
+// ── Page Header ─────────────────────────────────────────────
+function renderPageHeader() {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">งานซ่อมทั้งหมด</div>
+        <div class="page-sub">จัดการจ๊อบซ่อมทั้งหมด ค้นหา กรอง แก้ไข และ export ข้อมูล</div>
+      </div>
+      <div class="header-actions">
+        <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
+        <button class="btn btn-outline">📥 Export Excel</button>
+        <button class="btn btn-outline">🖨 Export PDF</button>
+        <button class="btn btn-outline">🖨 ใบรับรถ</button>
+        <button class="btn btn-outline">📋 ใบเสนอราคา</button>
+      </div>
+    </div>`;
+}
+
+// ── Filter Panel ─────────────────────────────────────────────
+function renderFilterPanel() {
+  return `
+    <div class="card">
+      <div class="filter-panel">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label class="filter-label">ทะเบียน</label>
+            <input class="filter-input" id="f-plate"    placeholder="กข-1234" />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">ชื่อลูกค้า</label>
+            <input class="filter-input" id="f-customer" placeholder="ชื่อลูกค้า..." />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">เบอร์โทร</label>
+            <input class="filter-input" id="f-phone"    placeholder="08x-xxx-xxxx" />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Job No</label>
+            <input class="filter-input" id="f-jobno"    placeholder="MT-2504-..." />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">สถานะงาน</label>
+            <select class="filter-select" id="f-status">
+              <option value="">-- ทุกสถานะ --</option>
+              <option>รับรถเข้า</option>
+              <option>ตรวจเช็ก</option>
+              <option>รออะไหล่</option>
+              <option>กำลังซ่อม</option>
+              <option>ตรวจซ้ำ</option>
+              <option>พร้อมส่งมอบ</option>
+              <option>ส่งมอบแล้ว</option>
+              <option>ยกเลิก</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">สถานะชำระ</label>
+            <select class="filter-select" id="f-pay">
+              <option value="">-- ทุกสถานะ --</option>
+              <option>ยังไม่ชำระ</option>
+              <option>มัดจำแล้ว</option>
+              <option>ชำระบางส่วน</option>
+              <option>ชำระครบ</option>
+              <option>ค้างชำระ</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">ผู้รับผิดชอบ</label>
+            <select class="filter-select" id="f-assignee">
+              <option value="">-- ทุกช่าง --</option>
+              <option>สุทธินนท์</option>
+              <option>ภควัต</option>
+              <option>อภิสิทธิ์</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">&nbsp;</label>
+            <button class="btn btn-outline btn-sm" id="clear-filters">✕ ล้างตัวกรอง</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Summary Strip ─────────────────────────────────────────────
+function renderSummaryStrip(s) {
+  const items = [
+    { val: s.total,         label: 'งานทั้งหมด',      color: '#1e6fc4' },
+    { val: s.waitParts,     label: 'รออะไหล่',         color: '#f59e0b' },
+    { val: s.inProgress,    label: 'กำลังซ่อม',        color: '#7c3aed' },
+    { val: s.readyDeliver,  label: 'พร้อมส่งมอบ',     color: '#059669' },
+    { val: s.delivered,     label: 'ส่งมอบแล้ว',      color: '#64748b' },
+    { val: s.arOverdue,     label: 'ค้างชำระ',         color: '#dc2626' },
+  ];
+
+  return `
+    <div class="summary-strip">
+      ${items.map(i => `
+        <div class="summary-card" style="--sc-color:${i.color};">
+          <div class="summary-val">${fmt.number(i.val)}</div>
+          <div class="summary-label">${i.label}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── Jobs Table ────────────────────────────────────────────────
+function renderJobsTable(jobs) {
+  const rows = jobs.map(job => `
+    <tr>
+      <td><input type="checkbox" /></td>
+      <td><a href="job-detail.html?id=${job.id}" class="job-no">${job.id}</a></td>
+      <td>${job.date}</td>
+      <td><span class="plate-tag">${job.plate}</span></td>
+      <td>${job.model}</td>
+      <td>${job.customer}</td>
+      <td style="font-family:monospace;">${job.phone}</td>
+      <td style="max-width:140px;white-space:normal;line-height:1.4;">${job.symptom}</td>
+      <td class="text-right">${fmt.baht(job.estimated)}</td>
+      <td class="text-right">${fmt.baht(job.actual)}</td>
+      <td>${jobStatusBadge[job.jobStatus] || job.jobStatus}</td>
+      <td>${payStatusBadge[job.payStatus] || job.payStatus}</td>
+      <td>${job.assignee}</td>
+      <td>${job.appointDate}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <a href="job-detail.html?id=${job.id}" class="btn btn-outline btn-xs">ดู</a>
+          <button class="btn btn-outline btn-xs">แก้</button>
+          <button class="btn btn-warn    btn-xs">สถานะ</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  return `
+    <div class="card table-wrap">
+      <div class="bulk-bar">
+        <div class="bulk-left">
+          <span class="bulk-title">รายการงาน</span>
+          <button class="bulk-btn">เปลี่ยนสถานะ</button>
+          <button class="bulk-btn">Export</button>
+          <button class="bulk-btn">พิมพ์</button>
+        </div>
+        <div class="bulk-right">
+          <div class="pagination">
+            <span style="margin-right:6px;">แสดง 1–${jobs.length} จาก 47 รายการ</span>
+            <div class="page-btn">‹</div>
+            <div class="page-btn active">1</div>
+            <div class="page-btn">2</div>
+            <div class="page-btn">3</div>
+            <div class="page-btn">›</div>
+          </div>
+        </div>
+      </div>
+      <table class="data-table" id="jobs-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" /></th>
+            <th>Job No</th>
+            <th>วันรับรถ</th>
+            <th>ทะเบียน</th>
+            <th>รุ่นรถ</th>
+            <th>ลูกค้า</th>
+            <th>เบอร์โทร</th>
+            <th>อาการ</th>
+            <th>ยอดประเมิน</th>
+            <th>ยอดจริง</th>
+            <th>สถานะงาน</th>
+            <th>ชำระเงิน</th>
+            <th>ผู้รับผิดชอบ</th>
+            <th>นัดรับรถ</th>
+            <th>จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Filter Clear ──────────────────────────────────────────────
+function clearFilters() {
+  ['f-plate','f-customer','f-phone','f-jobno'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['f-status','f-pay','f-assignee'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.selectedIndex = 0;
+  });
+}
+</script>
+</body>
+</html>
