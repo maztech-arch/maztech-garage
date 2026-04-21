@@ -6,348 +6,467 @@
   <title>Dashboard — Maztech Garage</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <h2>Maztech Garage</h2>
-      <nav>
-        <a href="dashboard.html">Dashboard</a>
-        <a href="jobs.html">Job Orders</a>
-        <a href="inventory.html">Inventory</a>
-        <a href="finance.html">Financial</a>
-      </nav>
-    </aside>
 
-    <div class="main-area">
-      <main class="page-content">
-        <div class="page-header">
-          <div>
-            <div class="page-greeting">สวัสดี, Maztech Garage 👋</div>
-            <div class="page-sub">
-              ภาพรวมงานซ่อม รายรับรายจ่าย และสถานะงานวันนี้
-              <span id="last-updated-text"></span>
-            </div>
-          </div>
-          <div class="header-actions">
-            <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
-            <button class="btn btn-secondary" onclick="fetchAllData()">รีเฟรชข้อมูล</button>
-          </div>
-        </div>
-
-        <div id="global-spinner" style="display:none; padding:12px;">กำลังโหลดข้อมูล...</div>
-        <div id="global-error" style="display:none; color:red; padding:12px;"></div>
-
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">เงินคงเหลือปัจจุบัน</div><div class="kpi-value" id="kpi-cash-balance">฿0</div></div>
-          <div class="kpi-card"><div class="kpi-label">รายรับเดือนนี้</div><div class="kpi-value" id="kpi-revenue">฿0</div></div>
-          <div class="kpi-card"><div class="kpi-label">รายจ่ายเดือนนี้</div><div class="kpi-value" id="kpi-expense">฿0</div></div>
-          <div class="kpi-card"><div class="kpi-label">กำไรสุทธิเบื้องต้น</div><div class="kpi-value" id="kpi-profit">฿0</div></div>
-          <div class="kpi-card"><div class="kpi-label">GP%</div><div class="kpi-value" id="gp-percent">0%</div></div>
-          <div class="kpi-card"><div class="kpi-label">รถกำลังซ่อม</div><div class="kpi-value" id="car-progress">0</div></div>
-          <div class="kpi-card"><div class="kpi-label">รถรออะไหล่</div><div class="kpi-value" id="car-wait-parts">0</div></div>
-          <div class="kpi-card"><div class="kpi-label">รถพร้อมส่งมอบ</div><div class="kpi-value" id="car-ready">0</div></div>
-          <div class="kpi-card"><div class="kpi-label">ลูกหนี้ค้างชำระ</div><div class="kpi-value" id="kpi-ar">฿0</div></div>
-        </div>
-
-        <div class="charts-row">
-          <div class="card">
-            <div class="card-header"><div class="card-title">รายรับ vs รายจ่าย</div></div>
-            <div class="card-body"><canvas id="revenueChart" height="140"></canvas></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><div class="card-title">จำนวนรถเข้าบริการ</div></div>
-            <div class="card-body"><canvas id="carChart" height="140"></canvas></div>
-          </div>
-        </div>
-
-        <div class="bottom-row">
-          <div class="card table-wrap">
-            <div class="card-header">
-              <div class="card-title">งานซ่อมล่าสุด</div>
-              <a href="jobs.html" class="see-all">ดูทั้งหมด →</a>
-            </div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Job No</th>
-                  <th>วันรับรถ</th>
-                  <th>ทะเบียน</th>
-                  <th>รุ่นรถ</th>
-                  <th>ลูกค้า</th>
-                  <th>สถานะ</th>
-                  <th>ยอดรวม</th>
-                </tr>
-              </thead>
-              <tbody id="job-table-body"></tbody>
-            </table>
-          </div>
-
-          <div class="right-col">
-            <div class="card">
-              <div class="card-header"><div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div></div>
-              <div class="card-body">
-                <div class="donut-wrap">
-                  <canvas id="donutChart" width="90" height="90"></canvas>
-                  <div class="donut-legend" id="donut-legend"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header"><div class="card-title">⚡ แจ้งเตือนสำคัญ</div></div>
-              <div class="card-body" id="alerts-panel"></div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  </div>
+<div class="app-shell" id="app"></div>
 
 <script>
-const API_URL = 'ใส่_URL_WEB_APP_ของคุณที่นี่';
+/* ============================================================
+   dashboard.js — inline page script
+   ============================================================ */
 
-let garageData = {
-  dashboard: null,
-  jobs: [],
-  alerts: [],
-  monthlyRevenue: [],
-  monthlyCars: [],
-  revenueCategory: []
-};
+(async () => {
+  chartDefaults();
 
-let revenueChart = null;
-let carChart = null;
-let donutChart = null;
+  // ── Fetch all data in parallel ──────────────────────────
+  const [dash, revenue, cars, catData, alertData] = await Promise.all([
+    MockData.getDashboard(),
+    MockData.getMonthlyRevenue(),
+    MockData.getMonthlyCars(),
+    MockData.getRevenueCategory(),
+    MockData.getAlerts(),
+  ]);
 
-async function fetchAllData() {
-  showLoading(true);
-  showError('');
+  // ── Build page HTML ─────────────────────────────────────
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('dashboard')}
+    <div class="main-area">
+      ${renderTopbar([
+        { label: 'Maztech Garage' },
+        { label: 'Dashboard' }
+      ])}
+      <main class="page-content">
+        ${renderPageHeader(dash)}
+        ${renderKPIGrid(dash)}
+        ${renderChartsRow()}
+        ${renderBottomRow(catData, alertData)}
+      </main>
+    </div>`;
 
-  try {
-    const [
-      dashRes,
-      jobsRes,
-      alertsRes,
-      revenueRes,
-      carsRes,
-      categoryRes
-    ] = await Promise.all([
-      fetch(`${API_URL}?action=getDashboard`),
-      fetch(`${API_URL}?action=getJobs`),
-      fetch(`${API_URL}?action=getAlerts`),
-      fetch(`${API_URL}?action=getMonthlyRevenue`),
-      fetch(`${API_URL}?action=getMonthlyCars`),
-      fetch(`${API_URL}?action=getRevenueCategory`)
-    ]);
+  // ── Draw charts after DOM is ready ─────────────────────
+  drawRevenueChart(revenue);
+  drawCarsChart(cars);
+  drawDonutChart(catData);
 
-    const dashJson = await dashRes.json();
-    const jobsJson = await jobsRes.json();
-    const alertsJson = await alertsRes.json();
-    const revenueJson = await revenueRes.json();
-    const carsJson = await carsRes.json();
-    const categoryJson = await categoryRes.json();
+  // ── Render recent jobs table ────────────────────────────
+  const jobs = await MockData.getJobs();
+  document.getElementById('recent-jobs-body').innerHTML = jobs.slice(0, 5).map(renderJobRow).join('');
 
-    if (!dashJson.ok) throw new Error(dashJson.error || 'getDashboard failed');
-    if (!jobsJson.ok) throw new Error(jobsJson.error || 'getJobs failed');
-    if (!alertsJson.ok) throw new Error(alertsJson.error || 'getAlerts failed');
-    if (!revenueJson.ok) throw new Error(revenueJson.error || 'getMonthlyRevenue failed');
-    if (!carsJson.ok) throw new Error(carsJson.error || 'getMonthlyCars failed');
-    if (!categoryJson.ok) throw new Error(categoryJson.error || 'getRevenueCategory failed');
+})();
 
-    garageData.dashboard = dashJson.data;
-    garageData.jobs = jobsJson.data || [];
-    garageData.alerts = alertsJson.data || [];
-    garageData.monthlyRevenue = revenueJson.data || [];
-    garageData.monthlyCars = carsJson.data || [];
-    garageData.revenueCategory = categoryJson.data || [];
-
-    updateAllUI();
-  } catch (error) {
-    console.error(error);
-    showError('ดึงข้อมูลไม่สำเร็จ: ' + error.message);
-  } finally {
-    showLoading(false);
-  }
+// ── Page Header ─────────────────────────────────────────────
+function renderPageHeader(dash) {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-greeting">สวัสดี, Maztech Garage 👋</div>
+        <div class="page-sub" id="today-date">ภาพรวมงานซ่อม รายรับรายจ่าย และสถานะงานวันนี้ — ${thaiDateToday().long}</div>
+      </div>
+      <div class="header-actions">
+        <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
+      </div>
+    </div>`;
 }
 
-function updateAllUI() {
-  const db = garageData.dashboard;
-  if (!db) return;
+// ── KPI Grid ────────────────────────────────────────────────
+function renderKPIGrid(d) {
+  const cards = [
+    {
+      icon: '💰', label: 'เงินคงเหลือปัจจุบัน',
+      value: fmt.baht(d.cashBalance),
+      change: 'KBank 225 + 051', cls: 'neutral',
+      accent: '#1e6fc4', iconBg: '#dbeafe',
+    },
+    {
+      icon: '📈', label: 'รายรับเดือนนี้',
+      value: fmt.baht(d.revenueMonth),
+      change: fmt.changeText(d.revenueChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.revenueChange),
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '📉', label: 'รายจ่ายเดือนนี้',
+      value: fmt.baht(d.expenseMonth),
+      change: fmt.changeText(d.expenseChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.expenseChange),
+      accent: '#f59e0b', iconBg: '#fef3c7',
+    },
+    {
+      icon: '✅', label: 'กำไรสุทธิเบื้องต้น',
+      value: fmt.baht(d.netProfitMonth),
+      change: `GP ${fmt.percent(d.gpPercent)} ▲ ดีขึ้น`, cls: 'up',
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '🔧', label: 'รถกำลังซ่อม',
+      value: fmt.number(d.carsInProgress) + ' คัน', sm: true,
+      change: 'ช่าง 3 คน กำลังดูแล', cls: 'neutral',
+      accent: '#1e6fc4', iconBg: '#dbeafe',
+    },
+    {
+      icon: '⏳', label: 'รถรออะไหล่',
+      value: fmt.number(d.carsWaitingParts) + ' คัน', sm: true,
+      change: `▲ ${d.carsChange} คันจากเมื่อวาน`, cls: 'down',
+      accent: '#f59e0b', iconBg: '#fef3c7',
+    },
+    {
+      icon: '🚗', label: 'รถพร้อมส่งมอบ',
+      value: fmt.number(d.carsReadyToDeliver) + ' คัน', sm: true,
+      change: 'แจ้งลูกค้าแล้ว', cls: 'up',
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '⚠️', label: 'ลูกหนี้ค้างชำระ',
+      value: fmt.baht(d.arOverdue), sm: true,
+      change: `${d.arOverdueCount} ราย เกิน 7 วัน`, cls: 'down',
+      accent: '#dc2626', iconBg: '#fee2e2',
+    },
+  ];
 
-  safeSetText('kpi-cash-balance', formatCurrency(db.cashBalance));
-  safeSetText('kpi-revenue', formatCurrency(db.revenueMonth));
-  safeSetText('kpi-expense', formatCurrency(db.expenseMonth));
-  safeSetText('kpi-profit', formatCurrency(db.netProfitMonth));
-  safeSetText('kpi-ar', formatCurrency(db.arOverdue));
-  safeSetText('car-progress', db.carsInProgress);
-  safeSetText('car-wait-parts', db.carsWaitingParts);
-  safeSetText('car-ready', db.carsReadyToDeliver);
-  safeSetText('gp-percent', (db.gpPercent || 0) + '%');
-  safeSetText('last-updated-text', ' | อัปเดตล่าสุด: ' + new Date().toLocaleString('th-TH'));
-
-  renderJobTable(garageData.jobs);
-  renderAlerts(garageData.alerts);
-  drawRevenueChart(garageData.monthlyRevenue);
-  drawCarsChart(garageData.monthlyCars);
-  drawDonutChart(garageData.revenueCategory);
+  return `
+    <div class="kpi-grid">
+      ${cards.map(c => `
+        <div class="kpi-card" style="--kpi-accent:${c.accent};--kpi-icon-bg:${c.iconBg};">
+          <div class="kpi-icon">${c.icon}</div>
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value${c.sm ? ' sm' : ''}">${c.value}</div>
+          <div class="kpi-change ${c.cls}">${c.change}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
-function renderJobTable(jobs) {
-  const tbody = document.getElementById('job-table-body');
-  if (!tbody) return;
-
-  tbody.innerHTML = '';
-
-  jobs.slice(0, 10).forEach(job => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${job.id || ''}</td>
-      <td>${job.date || ''}</td>
-      <td>${job.plate || ''}</td>
-      <td>${job.model || ''}</td>
-      <td>${job.customer || ''}</td>
-      <td>${job.jobStatus || ''}</td>
-      <td>${formatCurrency(job.actual || 0)}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+// ── Charts Row ───────────────────────────────────────────────
+function renderChartsRow() {
+  return `
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">รายรับ vs รายจ่าย</div>
+            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (หน่วย: บาท)</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="revenueChart" height="140"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">จำนวนรถเข้าบริการ</div>
+            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (คัน)</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="carChart" height="140"></canvas>
+        </div>
+      </div>
+    </div>`;
 }
 
-function renderAlerts(alerts) {
-  const panel = document.getElementById('alerts-panel');
-  if (!panel) return;
+// ── Bottom Row ───────────────────────────────────────────────
+function renderBottomRow(catData, alertData) {
+  return `
+    <div class="bottom-row">
+      <div class="card table-wrap">
+        <div class="card-header">
+          <div class="card-title">งานซ่อมล่าสุด</div>
+          <a href="jobs.html" class="see-all">ดูทั้งหมด →</a>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Job No</th><th>วันรับรถ</th><th>ทะเบียน</th>
+              <th>รุ่นรถ</th><th>ลูกค้า</th><th>สถานะ</th>
+              <th>ยอดรวม</th><th>ผู้รับผิดชอบ</th>
+            </tr>
+          </thead>
+          <tbody id="recent-jobs-body"></tbody>
+        </table>
+      </div>
 
-  if (!alerts.length) {
-    panel.innerHTML = '<div>ไม่มีแจ้งเตือน</div>';
-    return;
-  }
+      <div class="right-col">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div>
+              <div class="card-sub">เดือนมีนาคม 2568</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="donut-wrap">
+              <canvas id="donutChart" width="90" height="90" style="flex-shrink:0;"></canvas>
+              <div class="donut-legend" id="donut-legend"></div>
+            </div>
+          </div>
+        </div>
 
-  panel.innerHTML = alerts.map(a => `
-    <div class="alert-item" style="margin-bottom:10px;">
-      <div><strong>${a.tag || '-'}</strong></div>
-      <div>${a.text || ''}</div>
-    </div>
-  `).join('');
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚡ แจ้งเตือนสำคัญ</div>
+          </div>
+          <div class="card-body" style="padding:10px 16px;" id="alerts-panel"></div>
+        </div>
+      </div>
+    </div>`;
 }
 
+// ── Recent Jobs Row ──────────────────────────────────────────
+function renderJobRow(job) {
+  return `
+    <tr>
+      <td><a href="job-detail.html?id=${job.id}" class="job-no">${job.id}</a></td>
+      <td>${job.date}</td>
+      <td><span class="plate-tag">${job.plate}</span></td>
+      <td>${job.model}</td>
+      <td>${job.customer}</td>
+      <td>${jobStatusBadge[job.jobStatus] || job.jobStatus}</td>
+      <td>${fmt.baht(job.actual)}</td>
+      <td>${job.assignee}</td>
+    </tr>`;
+}
+
+// ── Charts ───────────────────────────────────────────────────
 function drawRevenueChart(data) {
-  const ctx = document.getElementById('revenueChart');
-  if (!ctx) return;
-
-  if (revenueChart) revenueChart.destroy();
-
-  revenueChart = new Chart(ctx, {
+  new Chart(document.getElementById('revenueChart'), {
     type: 'bar',
     data: {
       labels: data.map(d => d.month),
       datasets: [
         {
           label: 'รายรับ',
-          data: data.map(d => d.revenue || 0)
+          data: data.map(d => d.revenue),
+          backgroundColor: 'rgba(30,111,196,0.78)',
+          borderRadius: 4,
         },
         {
           label: 'รายจ่าย',
-          data: data.map(d => d.expense || 0)
-        }
-      ]
+          data: data.map(d => d.expense),
+          backgroundColor: 'rgba(245,158,11,0.65)',
+          borderRadius: 4,
+        },
+      ],
     },
     options: {
-      responsive: true
-    }
+      responsive: true,
+      plugins: {
+        legend: { labels: { boxWidth: 10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + fmt.baht(ctx.raw),
+          },
+        },
+      },
+      scales: {
+        y: { ticks: { callback: v => '฿' + (v / 1000).toFixed(0) + 'K' } },
+      },
+    },
   });
 }
 
 function drawCarsChart(data) {
-  const ctx = document.getElementById('carChart');
-  if (!ctx) return;
-
-  if (carChart) carChart.destroy();
-
-  carChart = new Chart(ctx, {
+  new Chart(document.getElementById('carChart'), {
     type: 'line',
     data: {
       labels: data.map(d => d.month),
-      datasets: [
-        {
-          label: 'จำนวนรถ',
-          data: data.map(d => d.count || 0),
-          fill: true,
-          tension: 0.3
-        }
-      ]
+      datasets: [{
+        label: 'จำนวนรถ (คัน)',
+        data: data.map(d => d.count),
+        borderColor: '#059669',
+        backgroundColor: 'rgba(5,150,105,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#059669',
+        pointRadius: 4,
+      }],
     },
     options: {
-      responsive: true
-    }
+      responsive: true,
+      plugins: { legend: { labels: { boxWidth: 10 } } },
+      scales: { y: { ticks: { stepSize: 5 } } },
+    },
   });
 }
 
-function drawDonutChart(data) {
-  const ctx = document.getElementById('donutChart');
-  const legend = document.getElementById('donut-legend');
-  if (!ctx || !legend) return;
-
-  if (donutChart) donutChart.destroy();
-
-  donutChart = new Chart(ctx, {
+function drawDonutChart(catData) {
+  new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
     data: {
-      labels: data.map(d => d.label),
-      datasets: [
-        {
-          data: data.map(d => d.percent || 0),
-          backgroundColor: data.map(d => d.color || '#999')
-        }
-      ]
+      datasets: [{
+        data: catData.map(c => c.percent),
+        backgroundColor: catData.map(c => c.color),
+        borderWidth: 2,
+        borderColor: '#fff',
+      }],
     },
     options: {
-      responsive: false
-    }
+      responsive: false,
+      cutout: '68%',
+      plugins: { legend: { display: false } },
+    },
   });
 
-  legend.innerHTML = data.map(d => `
-    <div style="margin-bottom:6px;">
-      <span style="display:inline-block;width:10px;height:10px;background:${d.color};margin-right:6px;"></span>
-      ${d.label} ${d.percent}%
-    </div>
-  `).join('');
+  // Render legend from data
+  document.getElementById('donut-legend').innerHTML = catData.map(c => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${c.color};"></div>
+      ${c.label}
+      <span class="legend-val">${c.percent}%</span>
+    </div>`).join('');
 }
 
-function safeSetText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.innerText = text;
+// ── Alerts Panel ─────────────────────────────────────────────
+MockData.getAlerts().then(alertData => {
+  document.getElementById('alerts-panel').innerHTML = alertData.map(a => {
+    const col = alertColors[a.level] || alertColors.info;
+    return `
+      <div class="alert-item">
+        <div class="alert-dot" style="background:${col.dot};"></div>
+        <div>
+          <div class="alert-text">${a.text}</div>
+          <span class="alert-tag" style="${col.tag}">${a.tag}</span>
+        </div>
+      </div>`;
+  }).join('');
+});
+</script>
+
+  <script>
+// 1. ใส่ URL ของ Web App ที่ได้จาก Google Apps Script (Deploy > New Deployment)
+const API_URL = 'ใส่_URL_WEB_APP_ของคุณที่นี่';
+
+// ตัวแปรกลางเก็บข้อมูลของ MAZTECH GARAGE (Global State)
+let garageData = {
+    dashboard: null,
+    jobs: [],
+    alerts: []
+};
+
+// 2. ฟังก์ชันดึงข้อมูลทั้งหมดพร้อมกัน (Concurrent Fetching)
+async function fetchRealTimeData() {
+    showLoading(true);
+    
+    try {
+        // เรียก API 3 เส้นพร้อมกันเพื่อความรวดเร็ว
+        const [dashRes, jobsRes, alertsRes] = await Promise.all([
+            fetch(`${API_URL}?action=getDashboard`),
+            fetch(`${API_URL}?action=getJobs`),
+            fetch(`${API_URL}?action=getAlerts`)
+        ]);
+
+        const dashJson = await dashRes.json();
+        const jobsJson = await jobsRes.json();
+        const alertsJson = await alertsRes.json();
+
+        // บันทึกลง Global State
+        if (dashJson.ok) garageData.dashboard = dashJson.data;
+        if (jobsJson.ok) garageData.jobs = jobsJson.data;
+        if (alertsJson.ok) garageData.alerts = alertsJson.data;
+
+        // สั่งอัพเดทหน้าจอทุกส่วน
+        updateAllUI();
+
+    } catch (error) {
+        console.error("การเชื่อมต่อข้อมูลขัดข้อง:", error);
+        alert("ไม่สามารถดึงข้อมูลอัพเดทได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต");
+    } finally {
+        showLoading(false);
+    }
+}
+
+// 3. ฟังก์ชันกระจายข้อมูลลงหน้าจอ (UI Updating)
+function updateAllUI() {
+    if (!garageData.dashboard) return;
+    
+    const db = garageData.dashboard;
+
+    // --- ส่วนที่ 1: KPI ตัวเลขหน้า Dashboard ---
+    // (หมายเหตุ: ตัวแปรฝั่งซ้าย getElementById ต้องตรงกับ id ใน HTML ของคุณ)
+    safeSetText('kpi-revenue', formatCurrency(db.revenueMonth));
+    safeSetText('kpi-expense', formatCurrency(db.expenseMonth));
+    safeSetText('kpi-ar', formatCurrency(db.arOverdue)); // ลูกหนี้ค้างชำระ
+    
+    safeSetText('car-progress', db.carsInProgress);
+    safeSetText('car-wait-parts', db.carsWaitingParts);
+    safeSetText('car-ready', db.carsReadyToDeliver);
+    safeSetText('gp-percent', db.gpPercent + '%');
+
+    // --- ส่วนที่ 2: ระบบการเงิน Two Pockets ---
+    // แยกเงินหมุนเวียน (Operations) และเงินปันผล/คืนทุน (Capital)
+    // สมมติฐาน: แบ่งกำไรสุทธิ (Net Profit) สำหรับปันผล
+    const netProfit = db.netProfitMonth;
+    const dividendPool = netProfit > 0 ? netProfit * 0.5 : 0; // สมมติปันผล 50% ของกำไร
+    const perShare = dividendPool / 4; 
+
+    safeSetText('pocket-operations', formatCurrency(db.cashBalance)); // ยอดเงินสดคงเหลือ
+    safeSetText('pocket-capital', formatCurrency(netProfit - dividendPool)); // เงินเก็บรักษาสภาพคล่อง
+    
+    // อัพเดทยอดปันผลหุ้นส่วน
+    safeSetText('div-oil', formatCurrency(perShare));
+    safeSetText('div-guy', formatCurrency(perShare));
+    safeSetText('div-pong', formatCurrency(perShare));
+    safeSetText('div-ae', formatCurrency(perShare));
+
+    // --- ส่วนที่ 3: อัพเดทรายการรถ (Job Orders) ---
+    renderJobTable(garageData.jobs);
+
+    // --- ส่วนที่ 4: แจ้งเตือน (Alerts) ---
+    renderAlerts(garageData.alerts);
+}
+
+// 4. ฟังก์ชันสำหรับสร้างตารางงานซ่อม
+function renderJobTable(jobs) {
+    const tbody = document.getElementById('job-table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = ''; // เคลียร์ตารางเก่า
+    
+    // แสดงเฉพาะงานที่ยังไม่ส่งมอบ 10 รายการล่าสุด
+    const activeJobs = jobs.filter(j => j.jobStatus !== 'ส่งมอบแล้ว').slice(0, 10);
+    
+    activeJobs.forEach(job => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${job.id}</td>
+            <td>${job.plate}</td>
+            <td>${job.model}</td>
+            <td><span class="badge ${getStatusColor(job.jobStatus)}">${job.jobStatus}</span></td>
+            <td>${formatCurrency(job.actual)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// 5. ระบบ Utility เสริม
+function safeSetText(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) el.innerText = text;
 }
 
 function formatCurrency(amount) {
-  return Number(amount || 0).toLocaleString('th-TH', {
-    style: 'currency',
-    currency: 'THB'
-  });
+    return Number(amount).toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
 }
 
-function showLoading(isLoading) {
-  const el = document.getElementById('global-spinner');
-  if (el) el.style.display = isLoading ? 'block' : 'none';
+function getStatusColor(status) {
+    if (status === 'รออะไหล่') return 'bg-danger'; // สีแดง
+    if (status === 'กำลังซ่อม') return 'bg-warning'; // สีส้ม
+    if (status === 'พร้อมส่งมอบ') return 'bg-success'; // สีเขียว
+    return 'bg-secondary'; // สีเทา
 }
 
-function showError(message) {
-  const el = document.getElementById('global-error');
-  if (!el) return;
-
-  if (message) {
-    el.style.display = 'block';
-    el.innerText = message;
-  } else {
-    el.style.display = 'none';
-    el.innerText = '';
-  }
+function showLoading(isLoad) {
+    const spinner = document.getElementById('global-spinner');
+    if (spinner) spinner.style.display = isLoad ? 'block' : 'none';
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  fetchAllData();
-  setInterval(fetchAllData, 180000);
-});
+// 6. ตั้งเวลาอัพเดทอัตโนมัติ (Polling) ทุกๆ 3 นาที (180,000 มิลลิวินาที)
+setInterval(fetchRealTimeData, 180000);
+
+// ดึงข้อมูลทันทีเมื่อเปิดหน้าเว็บครั้งแรก
+document.addEventListener('DOMContentLoaded', fetchRealTimeData);
+
 </script>
 </body>
 </html>
+
