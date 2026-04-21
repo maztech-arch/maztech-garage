@@ -6,329 +6,347 @@
   <title>Dashboard — Maztech Garage</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="mock-data.js"></script>
-  <script src="app.js"></script>
 </head>
 <body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <h2>Maztech Garage</h2>
+      <nav>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="jobs.html">Job Orders</a>
+        <a href="inventory.html">Inventory</a>
+        <a href="finance.html">Financial</a>
+      </nav>
+    </aside>
 
-<div class="app-shell" id="app"></div>
+    <div class="main-area">
+      <main class="page-content">
+        <div class="page-header">
+          <div>
+            <div class="page-greeting">สวัสดี, Maztech Garage 👋</div>
+            <div class="page-sub">
+              ภาพรวมงานซ่อม รายรับรายจ่าย และสถานะงานวันนี้
+              <span id="last-updated-text"></span>
+            </div>
+          </div>
+          <div class="header-actions">
+            <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
+            <button class="btn btn-secondary" onclick="fetchAllData()">รีเฟรชข้อมูล</button>
+          </div>
+        </div>
+
+        <div id="global-spinner" style="display:none; padding:12px;">กำลังโหลดข้อมูล...</div>
+        <div id="global-error" style="display:none; color:red; padding:12px;"></div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">เงินคงเหลือปัจจุบัน</div><div class="kpi-value" id="kpi-cash-balance">฿0</div></div>
+          <div class="kpi-card"><div class="kpi-label">รายรับเดือนนี้</div><div class="kpi-value" id="kpi-revenue">฿0</div></div>
+          <div class="kpi-card"><div class="kpi-label">รายจ่ายเดือนนี้</div><div class="kpi-value" id="kpi-expense">฿0</div></div>
+          <div class="kpi-card"><div class="kpi-label">กำไรสุทธิเบื้องต้น</div><div class="kpi-value" id="kpi-profit">฿0</div></div>
+          <div class="kpi-card"><div class="kpi-label">GP%</div><div class="kpi-value" id="gp-percent">0%</div></div>
+          <div class="kpi-card"><div class="kpi-label">รถกำลังซ่อม</div><div class="kpi-value" id="car-progress">0</div></div>
+          <div class="kpi-card"><div class="kpi-label">รถรออะไหล่</div><div class="kpi-value" id="car-wait-parts">0</div></div>
+          <div class="kpi-card"><div class="kpi-label">รถพร้อมส่งมอบ</div><div class="kpi-value" id="car-ready">0</div></div>
+          <div class="kpi-card"><div class="kpi-label">ลูกหนี้ค้างชำระ</div><div class="kpi-value" id="kpi-ar">฿0</div></div>
+        </div>
+
+        <div class="charts-row">
+          <div class="card">
+            <div class="card-header"><div class="card-title">รายรับ vs รายจ่าย</div></div>
+            <div class="card-body"><canvas id="revenueChart" height="140"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">จำนวนรถเข้าบริการ</div></div>
+            <div class="card-body"><canvas id="carChart" height="140"></canvas></div>
+          </div>
+        </div>
+
+        <div class="bottom-row">
+          <div class="card table-wrap">
+            <div class="card-header">
+              <div class="card-title">งานซ่อมล่าสุด</div>
+              <a href="jobs.html" class="see-all">ดูทั้งหมด →</a>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Job No</th>
+                  <th>วันรับรถ</th>
+                  <th>ทะเบียน</th>
+                  <th>รุ่นรถ</th>
+                  <th>ลูกค้า</th>
+                  <th>สถานะ</th>
+                  <th>ยอดรวม</th>
+                </tr>
+              </thead>
+              <tbody id="job-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="right-col">
+            <div class="card">
+              <div class="card-header"><div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div></div>
+              <div class="card-body">
+                <div class="donut-wrap">
+                  <canvas id="donutChart" width="90" height="90"></canvas>
+                  <div class="donut-legend" id="donut-legend"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">⚡ แจ้งเตือนสำคัญ</div></div>
+              <div class="card-body" id="alerts-panel"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
 
 <script>
-/* ============================================================
-   dashboard.js — inline page script
-   ============================================================ */
+const API_URL = 'ใส่_URL_WEB_APP_ของคุณที่นี่';
 
-(async () => {
-  chartDefaults();
+let garageData = {
+  dashboard: null,
+  jobs: [],
+  alerts: [],
+  monthlyRevenue: [],
+  monthlyCars: [],
+  revenueCategory: []
+};
 
-  // ── Fetch all data in parallel ──────────────────────────
-  const [dash, revenue, cars, catData, alertData] = await Promise.all([
-    MockData.getDashboard(),
-    MockData.getMonthlyRevenue(),
-    MockData.getMonthlyCars(),
-    MockData.getRevenueCategory(),
-    MockData.getAlerts(),
-  ]);
+let revenueChart = null;
+let carChart = null;
+let donutChart = null;
 
-  // ── Build page HTML ─────────────────────────────────────
-  document.getElementById('app').innerHTML = `
-    ${renderSidebar('dashboard')}
-    <div class="main-area">
-      ${renderTopbar([
-        { label: 'Maztech Garage' },
-        { label: 'Dashboard' }
-      ])}
-      <main class="page-content">
-        ${renderPageHeader(dash)}
-        ${renderKPIGrid(dash)}
-        ${renderChartsRow()}
-        ${renderBottomRow(catData, alertData)}
-      </main>
-    </div>`;
+async function fetchAllData() {
+  showLoading(true);
+  showError('');
 
-  // ── Draw charts after DOM is ready ─────────────────────
-  drawRevenueChart(revenue);
-  drawCarsChart(cars);
-  drawDonutChart(catData);
+  try {
+    const [
+      dashRes,
+      jobsRes,
+      alertsRes,
+      revenueRes,
+      carsRes,
+      categoryRes
+    ] = await Promise.all([
+      fetch(`${API_URL}?action=getDashboard`),
+      fetch(`${API_URL}?action=getJobs`),
+      fetch(`${API_URL}?action=getAlerts`),
+      fetch(`${API_URL}?action=getMonthlyRevenue`),
+      fetch(`${API_URL}?action=getMonthlyCars`),
+      fetch(`${API_URL}?action=getRevenueCategory`)
+    ]);
 
-  // ── Render recent jobs table ────────────────────────────
-  const jobs = await MockData.getJobs();
-  document.getElementById('recent-jobs-body').innerHTML = jobs.slice(0, 5).map(renderJobRow).join('');
+    const dashJson = await dashRes.json();
+    const jobsJson = await jobsRes.json();
+    const alertsJson = await alertsRes.json();
+    const revenueJson = await revenueRes.json();
+    const carsJson = await carsRes.json();
+    const categoryJson = await categoryRes.json();
 
-})();
+    if (!dashJson.ok) throw new Error(dashJson.error || 'getDashboard failed');
+    if (!jobsJson.ok) throw new Error(jobsJson.error || 'getJobs failed');
+    if (!alertsJson.ok) throw new Error(alertsJson.error || 'getAlerts failed');
+    if (!revenueJson.ok) throw new Error(revenueJson.error || 'getMonthlyRevenue failed');
+    if (!carsJson.ok) throw new Error(carsJson.error || 'getMonthlyCars failed');
+    if (!categoryJson.ok) throw new Error(categoryJson.error || 'getRevenueCategory failed');
 
-// ── Page Header ─────────────────────────────────────────────
-function renderPageHeader(dash) {
-  return `
-    <div class="page-header">
-      <div>
-        <div class="page-greeting">สวัสดี, Maztech Garage 👋</div>
-        <div class="page-sub" id="today-date">ภาพรวมงานซ่อม รายรับรายจ่าย และสถานะงานวันนี้ — ${thaiDateToday().long}</div>
-      </div>
-      <div class="header-actions">
-        <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
-      </div>
-    </div>`;
+    garageData.dashboard = dashJson.data;
+    garageData.jobs = jobsJson.data || [];
+    garageData.alerts = alertsJson.data || [];
+    garageData.monthlyRevenue = revenueJson.data || [];
+    garageData.monthlyCars = carsJson.data || [];
+    garageData.revenueCategory = categoryJson.data || [];
+
+    updateAllUI();
+  } catch (error) {
+    console.error(error);
+    showError('ดึงข้อมูลไม่สำเร็จ: ' + error.message);
+  } finally {
+    showLoading(false);
+  }
 }
 
-// ── KPI Grid ────────────────────────────────────────────────
-function renderKPIGrid(d) {
-  const cards = [
-    {
-      icon: '💰', label: 'เงินคงเหลือปัจจุบัน',
-      value: fmt.baht(d.cashBalance),
-      change: 'KBank 225 + 051', cls: 'neutral',
-      accent: '#1e6fc4', iconBg: '#dbeafe',
-    },
-    {
-      icon: '📈', label: 'รายรับเดือนนี้',
-      value: fmt.baht(d.revenueMonth),
-      change: fmt.changeText(d.revenueChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.revenueChange),
-      accent: '#059669', iconBg: '#d1fae5',
-    },
-    {
-      icon: '📉', label: 'รายจ่ายเดือนนี้',
-      value: fmt.baht(d.expenseMonth),
-      change: fmt.changeText(d.expenseChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.expenseChange),
-      accent: '#f59e0b', iconBg: '#fef3c7',
-    },
-    {
-      icon: '✅', label: 'กำไรสุทธิเบื้องต้น',
-      value: fmt.baht(d.netProfitMonth),
-      change: `GP ${fmt.percent(d.gpPercent)} ▲ ดีขึ้น`, cls: 'up',
-      accent: '#059669', iconBg: '#d1fae5',
-    },
-    {
-      icon: '🔧', label: 'รถกำลังซ่อม',
-      value: fmt.number(d.carsInProgress) + ' คัน', sm: true,
-      change: 'ช่าง 3 คน กำลังดูแล', cls: 'neutral',
-      accent: '#1e6fc4', iconBg: '#dbeafe',
-    },
-    {
-      icon: '⏳', label: 'รถรออะไหล่',
-      value: fmt.number(d.carsWaitingParts) + ' คัน', sm: true,
-      change: `▲ ${d.carsChange} คันจากเมื่อวาน`, cls: 'down',
-      accent: '#f59e0b', iconBg: '#fef3c7',
-    },
-    {
-      icon: '🚗', label: 'รถพร้อมส่งมอบ',
-      value: fmt.number(d.carsReadyToDeliver) + ' คัน', sm: true,
-      change: 'แจ้งลูกค้าแล้ว', cls: 'up',
-      accent: '#059669', iconBg: '#d1fae5',
-    },
-    {
-      icon: '⚠️', label: 'ลูกหนี้ค้างชำระ',
-      value: fmt.baht(d.arOverdue), sm: true,
-      change: `${d.arOverdueCount} ราย เกิน 7 วัน`, cls: 'down',
-      accent: '#dc2626', iconBg: '#fee2e2',
-    },
-  ];
+function updateAllUI() {
+  const db = garageData.dashboard;
+  if (!db) return;
 
-  return `
-    <div class="kpi-grid">
-      ${cards.map(c => `
-        <div class="kpi-card" style="--kpi-accent:${c.accent};--kpi-icon-bg:${c.iconBg};">
-          <div class="kpi-icon">${c.icon}</div>
-          <div class="kpi-label">${c.label}</div>
-          <div class="kpi-value${c.sm ? ' sm' : ''}">${c.value}</div>
-          <div class="kpi-change ${c.cls}">${c.change}</div>
-        </div>`).join('')}
-    </div>`;
+  safeSetText('kpi-cash-balance', formatCurrency(db.cashBalance));
+  safeSetText('kpi-revenue', formatCurrency(db.revenueMonth));
+  safeSetText('kpi-expense', formatCurrency(db.expenseMonth));
+  safeSetText('kpi-profit', formatCurrency(db.netProfitMonth));
+  safeSetText('kpi-ar', formatCurrency(db.arOverdue));
+  safeSetText('car-progress', db.carsInProgress);
+  safeSetText('car-wait-parts', db.carsWaitingParts);
+  safeSetText('car-ready', db.carsReadyToDeliver);
+  safeSetText('gp-percent', (db.gpPercent || 0) + '%');
+  safeSetText('last-updated-text', ' | อัปเดตล่าสุด: ' + new Date().toLocaleString('th-TH'));
+
+  renderJobTable(garageData.jobs);
+  renderAlerts(garageData.alerts);
+  drawRevenueChart(garageData.monthlyRevenue);
+  drawCarsChart(garageData.monthlyCars);
+  drawDonutChart(garageData.revenueCategory);
 }
 
-// ── Charts Row ───────────────────────────────────────────────
-function renderChartsRow() {
-  return `
-    <div class="charts-row">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">รายรับ vs รายจ่าย</div>
-            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (หน่วย: บาท)</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <canvas id="revenueChart" height="140"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">จำนวนรถเข้าบริการ</div>
-            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (คัน)</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <canvas id="carChart" height="140"></canvas>
-        </div>
-      </div>
-    </div>`;
+function renderJobTable(jobs) {
+  const tbody = document.getElementById('job-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  jobs.slice(0, 10).forEach(job => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${job.id || ''}</td>
+      <td>${job.date || ''}</td>
+      <td>${job.plate || ''}</td>
+      <td>${job.model || ''}</td>
+      <td>${job.customer || ''}</td>
+      <td>${job.jobStatus || ''}</td>
+      <td>${formatCurrency(job.actual || 0)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-// ── Bottom Row ───────────────────────────────────────────────
-function renderBottomRow(catData, alertData) {
-  return `
-    <div class="bottom-row">
-      <div class="card table-wrap">
-        <div class="card-header">
-          <div class="card-title">งานซ่อมล่าสุด</div>
-          <a href="jobs.html" class="see-all">ดูทั้งหมด →</a>
-        </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Job No</th><th>วันรับรถ</th><th>ทะเบียน</th>
-              <th>รุ่นรถ</th><th>ลูกค้า</th><th>สถานะ</th>
-              <th>ยอดรวม</th><th>ผู้รับผิดชอบ</th>
-            </tr>
-          </thead>
-          <tbody id="recent-jobs-body"></tbody>
-        </table>
-      </div>
+function renderAlerts(alerts) {
+  const panel = document.getElementById('alerts-panel');
+  if (!panel) return;
 
-      <div class="right-col">
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div>
-              <div class="card-sub">เดือนมีนาคม 2568</div>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="donut-wrap">
-              <canvas id="donutChart" width="90" height="90" style="flex-shrink:0;"></canvas>
-              <div class="donut-legend" id="donut-legend"></div>
-            </div>
-          </div>
-        </div>
+  if (!alerts.length) {
+    panel.innerHTML = '<div>ไม่มีแจ้งเตือน</div>';
+    return;
+  }
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">⚡ แจ้งเตือนสำคัญ</div>
-          </div>
-          <div class="card-body" style="padding:10px 16px;" id="alerts-panel"></div>
-        </div>
-      </div>
-    </div>`;
+  panel.innerHTML = alerts.map(a => `
+    <div class="alert-item" style="margin-bottom:10px;">
+      <div><strong>${a.tag || '-'}</strong></div>
+      <div>${a.text || ''}</div>
+    </div>
+  `).join('');
 }
 
-// ── Recent Jobs Row ──────────────────────────────────────────
-function renderJobRow(job) {
-  return `
-    <tr>
-      <td><a href="job-detail.html?id=${job.id}" class="job-no">${job.id}</a></td>
-      <td>${job.date}</td>
-      <td><span class="plate-tag">${job.plate}</span></td>
-      <td>${job.model}</td>
-      <td>${job.customer}</td>
-      <td>${jobStatusBadge[job.jobStatus] || job.jobStatus}</td>
-      <td>${fmt.baht(job.actual)}</td>
-      <td>${job.assignee}</td>
-    </tr>`;
-}
-
-// ── Charts ───────────────────────────────────────────────────
 function drawRevenueChart(data) {
-  new Chart(document.getElementById('revenueChart'), {
+  const ctx = document.getElementById('revenueChart');
+  if (!ctx) return;
+
+  if (revenueChart) revenueChart.destroy();
+
+  revenueChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: data.map(d => d.month),
       datasets: [
         {
           label: 'รายรับ',
-          data: data.map(d => d.revenue),
-          backgroundColor: 'rgba(30,111,196,0.78)',
-          borderRadius: 4,
+          data: data.map(d => d.revenue || 0)
         },
         {
           label: 'รายจ่าย',
-          data: data.map(d => d.expense),
-          backgroundColor: 'rgba(245,158,11,0.65)',
-          borderRadius: 4,
-        },
-      ],
+          data: data.map(d => d.expense || 0)
+        }
+      ]
     },
     options: {
-      responsive: true,
-      plugins: {
-        legend: { labels: { boxWidth: 10 } },
-        tooltip: {
-          callbacks: {
-            label: ctx => ' ' + fmt.baht(ctx.raw),
-          },
-        },
-      },
-      scales: {
-        y: { ticks: { callback: v => '฿' + (v / 1000).toFixed(0) + 'K' } },
-      },
-    },
+      responsive: true
+    }
   });
 }
 
 function drawCarsChart(data) {
-  new Chart(document.getElementById('carChart'), {
+  const ctx = document.getElementById('carChart');
+  if (!ctx) return;
+
+  if (carChart) carChart.destroy();
+
+  carChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: data.map(d => d.month),
-      datasets: [{
-        label: 'จำนวนรถ (คัน)',
-        data: data.map(d => d.count),
-        borderColor: '#059669',
-        backgroundColor: 'rgba(5,150,105,0.1)',
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: '#059669',
-        pointRadius: 4,
-      }],
+      datasets: [
+        {
+          label: 'จำนวนรถ',
+          data: data.map(d => d.count || 0),
+          fill: true,
+          tension: 0.3
+        }
+      ]
     },
     options: {
-      responsive: true,
-      plugins: { legend: { labels: { boxWidth: 10 } } },
-      scales: { y: { ticks: { stepSize: 5 } } },
-    },
+      responsive: true
+    }
   });
 }
 
-function drawDonutChart(catData) {
-  new Chart(document.getElementById('donutChart'), {
+function drawDonutChart(data) {
+  const ctx = document.getElementById('donutChart');
+  const legend = document.getElementById('donut-legend');
+  if (!ctx || !legend) return;
+
+  if (donutChart) donutChart.destroy();
+
+  donutChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      datasets: [{
-        data: catData.map(c => c.percent),
-        backgroundColor: catData.map(c => c.color),
-        borderWidth: 2,
-        borderColor: '#fff',
-      }],
+      labels: data.map(d => d.label),
+      datasets: [
+        {
+          data: data.map(d => d.percent || 0),
+          backgroundColor: data.map(d => d.color || '#999')
+        }
+      ]
     },
     options: {
-      responsive: false,
-      cutout: '68%',
-      plugins: { legend: { display: false } },
-    },
+      responsive: false
+    }
   });
 
-  // Render legend from data
-  document.getElementById('donut-legend').innerHTML = catData.map(c => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${c.color};"></div>
-      ${c.label}
-      <span class="legend-val">${c.percent}%</span>
-    </div>`).join('');
+  legend.innerHTML = data.map(d => `
+    <div style="margin-bottom:6px;">
+      <span style="display:inline-block;width:10px;height:10px;background:${d.color};margin-right:6px;"></span>
+      ${d.label} ${d.percent}%
+    </div>
+  `).join('');
 }
 
-// ── Alerts Panel ─────────────────────────────────────────────
-MockData.getAlerts().then(alertData => {
-  document.getElementById('alerts-panel').innerHTML = alertData.map(a => {
-    const col = alertColors[a.level] || alertColors.info;
-    return `
-      <div class="alert-item">
-        <div class="alert-dot" style="background:${col.dot};"></div>
-        <div>
-          <div class="alert-text">${a.text}</div>
-          <span class="alert-tag" style="${col.tag}">${a.tag}</span>
-        </div>
-      </div>`;
-  }).join('');
+function safeSetText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = text;
+}
+
+function formatCurrency(amount) {
+  return Number(amount || 0).toLocaleString('th-TH', {
+    style: 'currency',
+    currency: 'THB'
+  });
+}
+
+function showLoading(isLoading) {
+  const el = document.getElementById('global-spinner');
+  if (el) el.style.display = isLoading ? 'block' : 'none';
+}
+
+function showError(message) {
+  const el = document.getElementById('global-error');
+  if (!el) return;
+
+  if (message) {
+    el.style.display = 'block';
+    el.innerText = message;
+  } else {
+    el.style.display = 'none';
+    el.innerText = '';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  fetchAllData();
+  setInterval(fetchAllData, 180000);
 });
 </script>
 </body>
