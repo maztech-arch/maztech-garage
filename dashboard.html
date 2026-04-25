@@ -41,6 +41,7 @@
       <main class="page-content">
         ${renderPageHeader(dash)}
         ${renderKPIGrid(dash)}
+        ${renderOwnerDashboard(dash.owner)}
         ${renderChartsRow()}
         ${renderBottomRow(catData, alertData)}
       </main>
@@ -136,6 +137,117 @@ function renderKPIGrid(d) {
         </div>`).join('')}
     </div>`;
 }
+
+
+// ── Owner Dashboard / Partner Profit / Health Score ─────────
+function renderOwnerDashboard(owner = {}) {
+  const monthly = owner.monthlyProfit || { netProfit: 0, reserveAmount: 0, distributableProfit: 0, partners: [] };
+  const cumulative = owner.cumulativeProfit || { netProfit: 0, reserveAmount: 0, distributableProfit: 0 };
+  const finance = owner.financialHealth || { label: '—', tone: 'gray', cashCoverageDays: 0, expenseRatio: 0, message: '' };
+  const repair = owner.repairHealth || { label: '—', tone: 'gray', activeJobs: 0, waitingParts: 0, overdue3Days: 0, unpaidJobs: 0, unpaidAmount: 0, workInProcessValue: 0, message: '' };
+  const stats = owner.stats || {};
+  const partners = monthly.partners && monthly.partners.length ? monthly.partners : [
+    { name: 'โอ้', sharePercent: 25, shareAmount: 0 },
+    { name: 'กาย', sharePercent: 25, shareAmount: 0 },
+    { name: 'ออย', sharePercent: 25, shareAmount: 0 },
+    { name: 'พงษ์', sharePercent: 25, shareAmount: 0 },
+  ];
+
+  return `
+    <section class="owner-dashboard">
+      <div class="owner-section-header">
+        <div>
+          <div class="section-eyebrow">OWNER DASHBOARD</div>
+          <h2>กำไรหุ้นส่วน / สุขภาพการเงิน / สุขภาพงานซ่อม</h2>
+          <p>ตัวเลขเป็น “ประมาณการ ณ ปัจจุบัน” จากข้อมูลในระบบ ยังไม่ใช่ยอดปิดบัญชีรอบเดือนจริง</p>
+        </div>
+        <a class="btn btn-outline" href="reports.html">ดูรายงานทั้งหมด</a>
+      </div>
+
+      <div class="owner-grid">
+        <div class="owner-card partner-card">
+          <div class="owner-card-head">
+            <div>
+              <div class="owner-card-title">กำไรหุ้นส่วนเดือนปัจจุบัน</div>
+              <div class="owner-card-sub">กันสำรอง ${fmt.percent(monthly.reservePercent || 0)} ก่อนแบ่งกำไร</div>
+            </div>
+            <span class="health-pill ${profitTone(monthly.netProfit)}">${monthly.netProfit >= 0 ? 'กำไร' : 'ขาดทุน'}</span>
+          </div>
+          <div class="profit-metrics">
+            <div><span>กำไรสุทธิเดือนนี้</span><b>${fmt.baht(monthly.netProfit)}</b></div>
+            <div><span>เงินสำรอง</span><b>${fmt.baht(monthly.reserveAmount)}</b></div>
+            <div><span>กำไรพร้อมแบ่ง</span><b>${fmt.baht(monthly.distributableProfit)}</b></div>
+          </div>
+          <div class="partner-list">
+            ${partners.map(p => `
+              <div class="partner-row">
+                <div>
+                  <b>${App.esc(p.name)}</b>
+                  <span>${fmt.percent(p.sharePercent)} ของกำไรพร้อมแบ่ง</span>
+                </div>
+                <strong>${fmt.baht(p.shareAmount)}</strong>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div class="owner-card">
+          <div class="owner-card-head">
+            <div>
+              <div class="owner-card-title">กำไรสะสมทั้งหมด</div>
+              <div class="owner-card-sub">รวมจากรายรับ-รายจ่ายทั้งหมดใน localStorage</div>
+            </div>
+            <span class="health-pill ${profitTone(cumulative.netProfit)}">${cumulative.netProfit >= 0 ? 'กำไรสะสม' : 'ขาดทุนสะสม'}</span>
+          </div>
+          <div class="big-number ${cumulative.netProfit >= 0 ? 'positive' : 'text-red'}">${fmt.baht(cumulative.netProfit)}</div>
+          <div class="mini-grid">
+            <div><span>กันสำรองสะสม</span><b>${fmt.baht(cumulative.reserveAmount)}</b></div>
+            <div><span>พร้อมแบ่งสะสม</span><b>${fmt.baht(cumulative.distributableProfit)}</b></div>
+            <div><span>ค่าใช้จ่ายคงที่/เดือน</span><b>${fmt.baht(owner.fixedMonthlyExpense || 0)}</b></div>
+            <div><span>จ๊อบเดือนนี้</span><b>${fmt.number(stats.currentMonthJobCount)} งาน</b></div>
+          </div>
+        </div>
+
+        <div class="owner-card health-card">
+          <div class="owner-card-head">
+            <div>
+              <div class="owner-card-title">สุขภาพการเงิน</div>
+              <div class="owner-card-sub">ดูจากเงินสด รายรับ รายจ่าย และค่าใช้จ่ายคงที่</div>
+            </div>
+            <span class="health-pill ${finance.tone}">${finance.label}</span>
+          </div>
+          <div class="health-score ${finance.tone}">${finance.label}</div>
+          <p class="health-message">${App.esc(finance.message)}</p>
+          <div class="mini-grid">
+            <div><span>เงินสดพอใช้ประมาณ</span><b>${fmt.number(finance.cashCoverageDays)} วัน</b></div>
+            <div><span>รายจ่าย / รายรับ</span><b>${fmt.percent(finance.expenseRatio || 0)}</b></div>
+          </div>
+        </div>
+
+        <div class="owner-card health-card">
+          <div class="owner-card-head">
+            <div>
+              <div class="owner-card-title">สุขภาพงานซ่อม</div>
+              <div class="owner-card-sub">ดูจากงานค้าง รออะไหล่ พร้อมส่ง และยอดค้างรับ</div>
+            </div>
+            <span class="health-pill ${repair.tone}">${repair.label}</span>
+          </div>
+          <div class="health-score ${repair.tone}">${repair.label}</div>
+          <p class="health-message">${App.esc(repair.message)}</p>
+          <div class="repair-stat-grid">
+            <div><b>${fmt.number(repair.activeJobs)}</b><span>งานเปิดอยู่</span></div>
+            <div><b>${fmt.number(repair.waitingParts)}</b><span>รออะไหล่</span></div>
+            <div><b>${fmt.number(repair.overdue3Days)}</b><span>ค้าง >3 วัน</span></div>
+            <div><b>${fmt.baht(repair.unpaidAmount)}</b><span>ยอดยังไม่รับเงิน</span></div>
+          </div>
+        </div>
+      </div>
+    </section>`;
+}
+
+function profitTone(value) {
+  return Number(value || 0) >= 0 ? 'green' : 'red';
+}
+
 
 // ── Charts Row ───────────────────────────────────────────────
 function renderChartsRow() {

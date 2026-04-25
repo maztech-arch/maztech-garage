@@ -884,6 +884,83 @@ button.icon-btn { border:0; cursor:pointer; font-family:var(--font); }
 .gp-negative { color:var(--red); font-weight:700; }
 .gp-positive, .positive { color:var(--green); font-weight:700; }
 .text-right { text-align:right; }
+
+/* ==========================================================
+   Owner Dashboard additions — Partner Profit + Health Score
+   ========================================================== */
+.owner-dashboard { margin: 16px 0 18px; }
+.owner-section-header {
+  display:flex; align-items:flex-end; justify-content:space-between; gap:14px;
+  margin: 4px 0 12px;
+}
+.owner-section-header h2 { font-size:20px; line-height:1.2; color:var(--heading); margin:2px 0 4px; }
+.owner-section-header p { color:var(--label); font-size:12px; }
+.section-eyebrow {
+  color:var(--blue); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+}
+.owner-grid {
+  display:grid;
+  grid-template-columns: minmax(280px, 1.25fr) minmax(240px, .95fr) minmax(240px, .9fr) minmax(240px, .9fr);
+  gap:12px;
+}
+.owner-card {
+  background:var(--surface); border:1px solid var(--border-light); border-radius:16px;
+  box-shadow:var(--shadow-sm); padding:14px; min-height:184px; position:relative; overflow:hidden;
+}
+.owner-card::before {
+  content:""; position:absolute; inset:0 0 auto 0; height:4px;
+  background:linear-gradient(90deg, var(--blue), #14b8a6);
+}
+.owner-card-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.owner-card-title { font-size:14px; font-weight:800; color:var(--heading); }
+.owner-card-sub { font-size:11px; color:var(--label); margin-top:2px; }
+.health-pill {
+  display:inline-flex; align-items:center; justify-content:center; min-width:58px; height:24px;
+  padding:0 10px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap;
+}
+.health-pill.green, .health-score.green { background:var(--green-light); color:var(--green-text); }
+.health-pill.yellow, .health-score.yellow { background:var(--amber-light); color:var(--amber-text); }
+.health-pill.red, .health-score.red { background:var(--red-light); color:var(--red-text); }
+.health-pill.gray, .health-score.gray { background:var(--border-light); color:var(--label); }
+.profit-metrics {
+  display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:12px;
+}
+.profit-metrics div, .mini-grid div, .repair-stat-grid div {
+  background:#f8fafc; border:1px solid var(--border-light); border-radius:12px; padding:9px;
+}
+.profit-metrics span, .mini-grid span, .repair-stat-grid span {
+  display:block; font-size:10px; color:var(--label); margin-bottom:3px;
+}
+.profit-metrics b, .mini-grid b { color:var(--heading); font-size:13px; }
+.partner-list { display:flex; flex-direction:column; gap:7px; }
+.partner-row {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  border:1px solid var(--border-light); border-radius:12px; padding:8px 10px;
+  background:linear-gradient(180deg, #fff, #f8fafc);
+}
+.partner-row b { color:var(--heading); font-size:13px; }
+.partner-row span { display:block; font-size:10px; color:var(--label); margin-top:1px; }
+.partner-row strong { color:var(--green); font-size:14px; white-space:nowrap; }
+.big-number { font-size:26px; font-weight:900; line-height:1.1; margin:8px 0 14px; color:var(--heading); }
+.mini-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+.health-score {
+  display:inline-flex; align-items:center; justify-content:center;
+  height:38px; min-width:86px; padding:0 18px; border-radius:14px;
+  font-size:20px; font-weight:900; margin-bottom:10px;
+}
+.health-message { font-size:12px; color:var(--body); margin-bottom:10px; min-height:36px; }
+.repair-stat-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+.repair-stat-grid b { display:block; color:var(--heading); font-size:17px; line-height:1.1; }
+.text-red { color:var(--red) !important; font-weight:700; }
+@media (max-width: 1320px) {
+  .owner-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .owner-section-header { flex-direction:column; align-items:flex-start; }
+  .owner-grid { grid-template-columns:1fr; }
+  .profit-metrics, .mini-grid { grid-template-columns:1fr; }
+}
+
 @media print {
   .sidebar, .topbar, .header-actions, .right-rail, .sticky-actions, .filter-panel, .bulk-bar { display:none !important; }
   .app-shell, .main-area, .page-content, .detail-layout, .detail-main { display:block !important; height:auto !important; overflow:visible !important; }

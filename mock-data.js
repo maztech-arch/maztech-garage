@@ -18,7 +18,7 @@ const MockData = (() => {
   const num = (v) => Number(v || 0);
 
   const seed = {
-    version: 2,
+    version: 3,
     settings: {
       shopName: 'Maztech Garage',
       ownerName: 'เอ',
@@ -27,9 +27,22 @@ const MockData = (() => {
       vatRate: 0.07,
       gpTarget: 35,
       reservePercent: 30,
+      partners: [
+        { id: 'P001', name: 'โอ้', sharePercent: 25, status: 'Active' },
+        { id: 'P002', name: 'กาย', sharePercent: 25, status: 'Active' },
+        { id: 'P003', name: 'ออย', sharePercent: 25, status: 'Active' },
+        { id: 'P004', name: 'พงษ์', sharePercent: 25, status: 'Active' },
+      ],
+      fixedExpenses: [
+        { id: 'RENT', name: 'ค่าเช่า', amount: 35000 },
+        { id: 'SALARY_TECH_1', name: 'เงินเดือนช่างคนที่ 1', amount: 15000 },
+        { id: 'SALARY_TECH_2', name: 'เงินเดือนช่างคนที่ 2', amount: 15000 },
+        { id: 'SALARY_TECH_3', name: 'เงินเดือนช่างคนที่ 3', amount: 15000 },
+        { id: 'UTILITIES', name: 'ค่าน้ำไฟ', amount: 3000 },
+      ],
       bankAccounts: [
-        { id: 'KRCV', name: 'KBank-รับ', openingBalance: 185000 },
-        { id: 'KPAY', name: 'KBank-จ่าย', openingBalance: 99300 },
+        { id: 'KRCV', name: 'KBank-051', openingBalance: 185000 },
+        { id: 'KPAY', name: 'KBank-225', openingBalance: 99300 },
         { id: 'CASH', name: 'เงินสดหน้างาน', openingBalance: 0 },
       ],
       gasUrl: '',
@@ -148,8 +161,27 @@ const MockData = (() => {
   }
 
   function migrateDb(old) {
+    const oldVersion = Number(old.version || 0);
     const db = { ...clone(seed), ...old, version: seed.version };
     db.settings = { ...clone(seed.settings), ...(old.settings || {}) };
+
+    // Upgrade settings for Owner Dashboard without deleting user's working data.
+    if (!Array.isArray(db.settings.partners) || !db.settings.partners.length) {
+      db.settings.partners = clone(seed.settings.partners);
+    }
+    if (!Array.isArray(db.settings.fixedExpenses) || !db.settings.fixedExpenses.length) {
+      db.settings.fixedExpenses = clone(seed.settings.fixedExpenses);
+    }
+    if (!Array.isArray(db.settings.bankAccounts) || !db.settings.bankAccounts.length) {
+      db.settings.bankAccounts = clone(seed.settings.bankAccounts);
+    } else if (oldVersion < 3) {
+      db.settings.bankAccounts = db.settings.bankAccounts.map(acc => {
+        if (acc.id === 'KRCV' || acc.name === 'KBank-รับ') return { ...acc, name: 'KBank-051' };
+        if (acc.id === 'KPAY' || acc.name === 'KBank-จ่าย') return { ...acc, name: 'KBank-225' };
+        return acc;
+      });
+    }
+
     ['customers','vehicles','parts','jobs','cashflow','audit'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
     return db;
@@ -257,6 +289,68 @@ const MockData = (() => {
     return db.cashflow.filter(x => String(x.date || '').slice(0, 7) === mk);
   }
 
+  function currentMonthJobs(db) {
+    const mk = App.monthKey ? App.monthKey() : new Date().toISOString().slice(0,7);
+    return db.jobs.filter(j => String(j.openDate || '').slice(0, 7) === mk);
+  }
+
+  function fixedExpenseTotal(settings) {
+    return (settings.fixedExpenses || []).reduce((s, x) => s + num(x.amount), 0);
+  }
+
+  function profitSplit(netProfit, settings) {
+    const reservePercent = num(settings.reservePercent || 0);
+    const positiveProfit = Math.max(0, num(netProfit));
+    const reserveAmount = Math.round(positiveProfit * reservePercent / 100);
+    const distributableProfit = Math.max(0, positiveProfit - reserveAmount);
+    const partners = (settings.partners || []).map(p => ({
+      ...p,
+      shareAmount: Math.round(distributableProfit * num(p.sharePercent) / 100),
+    }));
+    return { reservePercent, reserveAmount, distributableProfit, partners };
+  }
+
+  function financialHealth({ cashBalance, revenueMonth, expenseMonth, netProfitMonth, fixedMonthlyExpense }) {
+    const cashCoverageDays = fixedMonthlyExpense > 0 ? Math.round((cashBalance / fixedMonthlyExpense) * 30) : 0;
+    const expenseRatio = revenueMonth > 0 ? (expenseMonth / revenueMonth) * 100 : 0;
+    let level = 'good', label = 'ดี', tone = 'green', message = 'เงินสดมากกว่าค่าใช้จ่ายคงที่ และเดือนนี้ยังมีกำไร';
+    if (cashBalance < fixedMonthlyExpense || netProfitMonth < 0) {
+      level = 'danger'; label = 'เสี่ยง'; tone = 'red'; message = 'เงินสดต่ำกว่าค่าใช้จ่ายคงที่ หรือเดือนนี้ขาดทุน ควรชะลอรายจ่ายและเร่งเก็บเงิน';
+    } else if (cashBalance < fixedMonthlyExpense * 1.5 || expenseRatio > 80) {
+      level = 'warning'; label = 'ระวัง'; tone = 'yellow'; message = 'ยังพอไปต่อได้ แต่รายจ่ายค่อนข้างสูงเมื่อเทียบกับรายรับ';
+    }
+    return { level, label, tone, message, cashCoverageDays, expenseRatio };
+  }
+
+  function repairHealth(db) {
+    const activeJobs = db.jobs.filter(j => !['ส่งมอบแล้ว','ยกเลิก'].includes(j.jobStatus));
+    const waitingParts = activeJobs.filter(j => j.jobStatus === 'รออะไหล่');
+    const inProgress = activeJobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ'].includes(j.jobStatus));
+    const readyToDeliver = activeJobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ');
+    const overdue3Days = activeJobs.filter(j => Math.max(0, Math.round((Date.now() - new Date(j.openDate).getTime()) / 86400000)) > 3);
+    const unpaidJobs = db.jobs.map(j => ({ job: j, totals: calcJobTotals(j) })).filter(x => x.totals.remaining > 0 && x.job.payStatus !== 'ชำระครบ');
+    const workInProcessValue = activeJobs.reduce((s, j) => s + calcJobTotals(j).grand, 0);
+    const readyUnpaid = readyToDeliver.filter(j => calcJobTotals(j).remaining > 0);
+    let level = 'good', label = 'ดี', tone = 'green', message = 'งานซ่อมไหลลื่น ไม่มีคอขวดสำคัญ';
+    if (waitingParts.length > 3 || overdue3Days.length > 5 || readyUnpaid.length > 0) {
+      level = 'danger'; label = 'เสี่ยง'; tone = 'red'; message = 'มีงานค้าง/รออะไหล่หรือพร้อมส่งแต่ยังไม่เก็บเงิน ควรเร่งติดตาม';
+    } else if (waitingParts.length > 0 || overdue3Days.length > 2 || unpaidJobs.length > 2) {
+      level = 'warning'; label = 'ระวัง'; tone = 'yellow'; message = 'มีงานบางส่วนเริ่มเป็นคอขวด ควรตรวจสถานะรายวัน';
+    }
+    return {
+      level, label, tone, message,
+      activeJobs: activeJobs.length,
+      waitingParts: waitingParts.length,
+      inProgress: inProgress.length,
+      readyToDeliver: readyToDeliver.length,
+      overdue3Days: overdue3Days.length,
+      unpaidJobs: unpaidJobs.length,
+      unpaidAmount: unpaidJobs.reduce((s, x) => s + x.totals.remaining, 0),
+      workInProcessValue,
+      readyUnpaid: readyUnpaid.length,
+    };
+  }
+
   function jobsSorted(db) {
     return db.jobs.slice().sort((a, b) => String(b.openDate).localeCompare(String(a.openDate)) || String(b.id).localeCompare(String(a.id)));
   }
@@ -300,8 +394,11 @@ const MockData = (() => {
   function getDashboardLocal() {
     const db = loadDb();
     const thisMonth = currentMonthCashflow(db);
+    const allCashflow = db.cashflow || [];
     const revenueMonth = thisMonth.filter(x => x.type === 'in').reduce((s, x) => s + num(x.amount), 0);
     const expenseMonth = thisMonth.filter(x => x.type === 'out').reduce((s, x) => s + num(x.amount), 0);
+    const totalRevenueAll = allCashflow.filter(x => x.type === 'in').reduce((s, x) => s + num(x.amount), 0);
+    const totalExpenseAll = allCashflow.filter(x => x.type === 'out').reduce((s, x) => s + num(x.amount), 0);
     const activeJobs = db.jobs.filter(j => !['ส่งมอบแล้ว','ยกเลิก'].includes(j.jobStatus));
     const ready = db.jobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ').length;
     const wait = db.jobs.filter(j => j.jobStatus === 'รออะไหล่').length;
@@ -310,11 +407,41 @@ const MockData = (() => {
     const allJobTotals = db.jobs.map(calcJobTotals).filter(t => t.grand > 0);
     const grossSell = allJobTotals.reduce((s, t) => s + t.afterDisc, 0);
     const grossCost = allJobTotals.reduce((s, t) => s + t.partsCost, 0);
+    const cashBalance = accountBalances(db).reduce((s, a) => s + a.balance, 0);
+    const netProfitMonth = revenueMonth - expenseMonth;
+    const netProfitAll = totalRevenueAll - totalExpenseAll;
+    const fixedMonthlyExpense = fixedExpenseTotal(db.settings);
+    const monthJobs = currentMonthJobs(db).map(calcJobTotals).filter(t => t.grand > 0);
+    const owner = {
+      fixedMonthlyExpense,
+      monthlyProfit: {
+        netProfit: netProfitMonth,
+        ...profitSplit(netProfitMonth, db.settings),
+      },
+      cumulativeProfit: {
+        revenue: totalRevenueAll,
+        expense: totalExpenseAll,
+        netProfit: netProfitAll,
+        ...profitSplit(netProfitAll, db.settings),
+      },
+      financialHealth: financialHealth({ cashBalance, revenueMonth, expenseMonth, netProfitMonth, fixedMonthlyExpense }),
+      repairHealth: repairHealth(db),
+      stats: {
+        currentMonthJobCount: currentMonthJobs(db).length,
+        avgRevenuePerJob: monthJobs.length ? Math.round(monthJobs.reduce((s, t) => s + t.grand, 0) / monthJobs.length) : 0,
+        totalCustomers: db.customers.length,
+        totalVehicles: db.vehicles.length,
+      },
+      partners: clone(db.settings.partners || []),
+      fixedExpenses: clone(db.settings.fixedExpenses || []),
+    };
     return {
-      cashBalance: accountBalances(db).reduce((s, a) => s + a.balance, 0),
+      cashBalance,
       revenueMonth,
       expenseMonth,
-      netProfitMonth: revenueMonth - expenseMonth,
+      netProfitMonth,
+      netProfitAll,
+      fixedMonthlyExpense,
       gpPercent: grossSell ? ((grossSell - grossCost) / grossSell) * 100 : 0,
       carsInProgress: inProgress,
       carsWaitingParts: wait,
@@ -325,6 +452,7 @@ const MockData = (() => {
       expenseChange: 0,
       carsChange: activeJobs.length,
       accountBalances: accountBalances(db),
+      owner,
     };
   }
 
@@ -449,6 +577,7 @@ const MockData = (() => {
         jobs: jobsSorted(db).map(normalizeJob),
         parts: clone(db.parts),
         accounts: accountBalances(db),
+        owner: getDashboardLocal().owner,
       };
     },
     getAudit: async () => clone(loadDb().audit),
