@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Preview — Maztech Garage</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="theme-preview.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+
+<div class="app-shell" id="app"></div>
+
+<script>
+/* ============================================================
+   dashboard.js — inline page script
+   ============================================================ */
+
+(async () => {
+  chartDefaults();
+
+  // ── Fetch all data in parallel ──────────────────────────
+  const [dash, revenue, cars, catData, alertData] = await Promise.all([
+    MockData.getDashboard(),
+    MockData.getMonthlyRevenue(),
+    MockData.getMonthlyCars(),
+    MockData.getRevenueCategory(),
+    MockData.getAlerts(),
+  ]);
+
+  // ── Build page HTML ─────────────────────────────────────
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('dashboard')}
+    <div class="main-area">
+      ${renderTopbar([
+        { label: 'Maztech Garage' },
+        { label: 'Dashboard Preview' }
+      ])}
+      <main class="page-content">
+        ${renderPageHeader(dash)}
+        ${renderKPIGrid(dash)}
+        ${renderChartsRow()}
+        ${renderBottomRow(catData, alertData)}
+      </main>
+    </div>`;
+
+  // ── Draw charts after DOM is ready ─────────────────────
+  drawRevenueChart(revenue);
+  drawCarsChart(cars);
+  drawDonutChart(catData);
+  wireGlobalSearch();
+
+  // ── Render recent jobs table ────────────────────────────
+  const jobs = await MockData.getJobs();
+  document.getElementById('recent-jobs-body').innerHTML = jobs.slice(0, 5).map(renderJobRow).join('');
+
+})();
+
+// ── Page Header ─────────────────────────────────────────────
+function renderPageHeader(dash) {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-greeting">ตัวอย่างโทนสีใหม่ Maztech Garage 👋</div>
+        <div class="page-sub" id="today-date">Preview โทน Soft Mint / Teal / Cream — ยังไม่กระทบหน้าใช้งานจริง — ${thaiDateToday().long}</div>
+      </div>
+      <div class="header-actions">
+        <a href="new-job.html" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
+      </div>
+    </div>`;
+}
+
+// ── KPI Grid ────────────────────────────────────────────────
+function renderKPIGrid(d) {
+  const cards = [
+    {
+      icon: '💰', label: 'เงินคงเหลือปัจจุบัน',
+      value: fmt.baht(d.cashBalance),
+      change: 'KBank 225 + 051', cls: 'neutral',
+      accent: '#1e6fc4', iconBg: '#dbeafe',
+    },
+    {
+      icon: '📈', label: 'รายรับเดือนนี้',
+      value: fmt.baht(d.revenueMonth),
+      change: fmt.changeText(d.revenueChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.revenueChange),
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '📉', label: 'รายจ่ายเดือนนี้',
+      value: fmt.baht(d.expenseMonth),
+      change: fmt.changeText(d.expenseChange) + ' จากเดือนก่อน', cls: fmt.changeClass(d.expenseChange),
+      accent: '#f59e0b', iconBg: '#fef3c7',
+    },
+    {
+      icon: '✅', label: 'กำไรสุทธิเบื้องต้น',
+      value: fmt.baht(d.netProfitMonth),
+      change: `GP ${fmt.percent(d.gpPercent)} ▲ ดีขึ้น`, cls: 'up',
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '🔧', label: 'รถกำลังซ่อม',
+      value: fmt.number(d.carsInProgress) + ' คัน', sm: true,
+      change: 'ช่าง 3 คน กำลังดูแล', cls: 'neutral',
+      accent: '#1e6fc4', iconBg: '#dbeafe',
+    },
+    {
+      icon: '⏳', label: 'รถรออะไหล่',
+      value: fmt.number(d.carsWaitingParts) + ' คัน', sm: true,
+      change: `▲ ${d.carsChange} คันจากเมื่อวาน`, cls: 'down',
+      accent: '#f59e0b', iconBg: '#fef3c7',
+    },
+    {
+      icon: '🚗', label: 'รถพร้อมส่งมอบ',
+      value: fmt.number(d.carsReadyToDeliver) + ' คัน', sm: true,
+      change: 'แจ้งลูกค้าแล้ว', cls: 'up',
+      accent: '#059669', iconBg: '#d1fae5',
+    },
+    {
+      icon: '⚠️', label: 'ลูกหนี้ค้างชำระ',
+      value: fmt.baht(d.arOverdue), sm: true,
+      change: `${d.arOverdueCount} ราย เกิน 7 วัน`, cls: 'down',
+      accent: '#dc2626', iconBg: '#fee2e2',
+    },
+  ];
+
+  return `
+    <div class="kpi-grid">
+      ${cards.map(c => `
+        <div class="kpi-card" style="--kpi-accent:${c.accent};--kpi-icon-bg:${c.iconBg};">
+          <div class="kpi-icon">${c.icon}</div>
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value${c.sm ? ' sm' : ''}">${c.value}</div>
+          <div class="kpi-change ${c.cls}">${c.change}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── Charts Row ───────────────────────────────────────────────
+function renderChartsRow() {
+  return `
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">รายรับ vs รายจ่าย</div>
+            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (หน่วย: บาท)</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="revenueChart" height="140"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">จำนวนรถเข้าบริการ</div>
+            <div class="card-sub">รายเดือน ย้อนหลัง 6 เดือน (คัน)</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="carChart" height="140"></canvas>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Bottom Row ───────────────────────────────────────────────
+function renderBottomRow(catData, alertData) {
+  return `
+    <div class="bottom-row">
+      <div class="card table-wrap">
+        <div class="card-header">
+          <div class="card-title">งานซ่อมล่าสุด</div>
+          <a href="jobs.html" class="see-all">ดูทั้งหมด →</a>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Job No</th><th>วันรับรถ</th><th>ทะเบียน</th>
+              <th>รุ่นรถ</th><th>ลูกค้า</th><th>สถานะ</th>
+              <th>ยอดรวม</th><th>ผู้รับผิดชอบ</th>
+            </tr>
+          </thead>
+          <tbody id="recent-jobs-body"></tbody>
+        </table>
+      </div>
+
+      <div class="right-col">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div>
+              <div class="card-sub">เดือนปัจจุบัน</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="donut-wrap">
+              <canvas id="donutChart" width="90" height="90" style="flex-shrink:0;"></canvas>
+              <div class="donut-legend" id="donut-legend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚡ แจ้งเตือนสำคัญ</div>
+          </div>
+          <div class="card-body" style="padding:10px 16px;" id="alerts-panel"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Recent Jobs Row ──────────────────────────────────────────
+function renderJobRow(job) {
+  return `
+    <tr>
+      <td><a href="job-detail.html?id=${job.id}" class="job-no">${job.id}</a></td>
+      <td>${job.date}</td>
+      <td><span class="plate-tag">${job.plate}</span></td>
+      <td>${job.model}</td>
+      <td>${job.customer}</td>
+      <td>${jobStatusBadge[job.jobStatus] || job.jobStatus}</td>
+      <td>${fmt.baht(job.actual)}</td>
+      <td>${job.assignee}</td>
+    </tr>`;
+}
+
+// ── Charts ───────────────────────────────────────────────────
+function drawRevenueChart(data) {
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.month),
+      datasets: [
+        {
+          label: 'รายรับ',
+          data: data.map(d => d.revenue),
+          backgroundColor: 'rgba(30,111,196,0.78)',
+          borderRadius: 4,
+        },
+        {
+          label: 'รายจ่าย',
+          data: data.map(d => d.expense),
+          backgroundColor: 'rgba(245,158,11,0.65)',
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { boxWidth: 10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + fmt.baht(ctx.raw),
+          },
+        },
+      },
+      scales: {
+        y: { ticks: { callback: v => '฿' + (v / 1000).toFixed(0) + 'K' } },
+      },
+    },
+  });
+}
+
+function drawCarsChart(data) {
+  new Chart(document.getElementById('carChart'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.month),
+      datasets: [{
+        label: 'จำนวนรถ (คัน)',
+        data: data.map(d => d.count),
+        borderColor: '#059669',
+        backgroundColor: 'rgba(5,150,105,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#059669',
+        pointRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { boxWidth: 10 } } },
+      scales: { y: { ticks: { stepSize: 5 } } },
+    },
+  });
+}
+
+function drawDonutChart(catData) {
+  new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: catData.map(c => c.percent),
+        backgroundColor: catData.map(c => c.color),
+        borderWidth: 2,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      responsive: false,
+      cutout: '68%',
+      plugins: { legend: { display: false } },
+    },
+  });
+
+  // Render legend from data
+  document.getElementById('donut-legend').innerHTML = catData.map(c => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${c.color};"></div>
+      ${c.label}
+      <span class="legend-val">${c.percent}%</span>
+    </div>`).join('');
+}
+
+// ── Alerts Panel ─────────────────────────────────────────────
+MockData.getAlerts().then(alertData => {
+  document.getElementById('alerts-panel').innerHTML = alertData.map(a => {
+    const col = alertColors[a.level] || alertColors.info;
+    return `
+      <div class="alert-item">
+        <div class="alert-dot" style="background:${col.dot};"></div>
+        <div>
+          <div class="alert-text">${a.text}</div>
+          <span class="alert-tag" style="${col.tag}">${a.tag}</span>
+        </div>
+      </div>`;
+  }).join('');
+});
+</script>
+</body>
+</html>
