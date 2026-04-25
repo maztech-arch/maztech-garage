@@ -39,6 +39,20 @@ const App = {
   },
 };
 
+function masterList(settings, key, fallback = []) {
+  const masters = (settings && settings.dropdownMasters) || {};
+  const list = Array.isArray(masters[key]) ? masters[key] : fallback;
+  return list.filter(Boolean);
+}
+
+function datalistOptions(items = []) {
+  return items.map(x => `<option value="${App.esc(x)}"></option>`).join('');
+}
+
+function selectOptions(items = [], selected = '') {
+  return items.map(x => `<option ${x === selected ? 'selected' : ''}>${App.esc(x)}</option>`).join('');
+}
+
 // ── Current Thai Buddhist Era Date ────────────────────────
 function thaiDateToday() {
   const d   = new Date();

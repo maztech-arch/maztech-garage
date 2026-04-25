@@ -13,6 +13,9 @@
 <script>
 (async () => {
   const settings = await MockData.getSettings();
+  const modelOptions = datalistOptions(masterList(settings, 'vehicleModels'));
+  const jobStatusOptions = selectOptions(masterList(settings, 'jobStatuses'), 'รับรถเข้า');
+  const channelOptions = selectOptions(masterList(settings, 'channels'), 'โอน/QR');
   document.getElementById('app').innerHTML = `
     ${renderSidebar('new-job')}
     <div class="main-area">
@@ -28,7 +31,7 @@
               <label class="form-field"><span>LINE / ช่องทางติดต่อ</span><input name="line" placeholder="@line หรือ Facebook" /></label>
               <label class="form-field"><span>ประเภทลูกค้า</span><select name="type"><option>ลูกค้าทั่วไป</option><option>ลูกค้าประจำ</option><option>ลูกค้า VIP</option><option>ลูกค้าฟลีท</option></select></label>
               <label class="form-field"><span>ทะเบียนรถ *</span><input name="plate" required placeholder="กข-1234" /></label>
-              <label class="form-field"><span>รุ่นรถ *</span><input name="model" required placeholder="Mazda2 / CX-5 / CX-30" /></label>
+              <label class="form-field"><span>รุ่นรถ *</span><input name="model" list="vehicle-model-list" required placeholder="เลือกหรือพิมพ์รุ่นรถ" /><datalist id="vehicle-model-list">${modelOptions}</datalist></label>
               <label class="form-field"><span>เลขไมล์</span><input name="mileage" type="number" min="0" placeholder="85000" /></label>
               <label class="form-field"><span>สีรถ</span><input name="color" placeholder="ขาว / เทา / แดง" /></label>
               <label class="form-field full"><span>VIN / หมายเลขตัวถัง</span><input name="vin" placeholder="ถ้ามี" /></label>
@@ -42,7 +45,7 @@
             <div class="form-grid">
               <label class="form-field"><span>วันที่รับรถ</span><input name="openDate" type="date" value="${App.todayISO()}" /></label>
               <label class="form-field"><span>นัดรับรถ</span><input name="appointDate" type="date" /></label>
-              <label class="form-field"><span>สถานะเริ่มต้น</span><select name="jobStatus"><option>รับรถเข้า</option><option>ตรวจเช็ก</option><option>เสนอราคา</option><option>รออะไหล่</option><option>กำลังซ่อม</option></select></label>
+              <label class="form-field"><span>สถานะเริ่มต้น</span><select name="jobStatus">${jobStatusOptions}</select></label>
               <label class="form-field"><span>ผู้รับผิดชอบ</span><select name="assignee"><option>เอ</option><option>สุทธินนท์</option><option>ภควัต</option><option>อภิสิทธิ์</option></select></label>
               <label class="form-field"><span>ความเร่งด่วน</span><select name="urgency"><option value="1">1 - ปกติ</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5 - เร่งด่วนมาก</option></select></label>
               <label class="form-field"><span>ยอดประเมิน</span><input name="estimated" type="number" min="0" placeholder="15000" /></label>
@@ -62,7 +65,7 @@
               <label class="form-field"><span>ส่วนลด</span><input name="discount" type="number" min="0" value="0" /></label>
               <label class="form-field"><span>รับมัดจำ</span><input name="deposit" type="number" min="0" value="0" /></label>
               <label class="form-field"><span>เข้าบัญชี</span><select name="accountId">${settings.bankAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></label>
-              <label class="form-field"><span>ช่องทางรับเงิน</span><select name="channel"><option>โอน/QR</option><option>เงินสด</option><option>EDC/K SHOP</option></select></label>
+              <label class="form-field"><span>ช่องทางรับเงิน</span><select name="channel">${channelOptions}</select></label>
               <label class="form-field check-row"><input type="checkbox" name="useVat" /> <span>คิด VAT ตามค่าตั้งระบบ</span></label>
             </div>
           </div>

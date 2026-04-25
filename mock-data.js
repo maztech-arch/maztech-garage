@@ -18,7 +18,7 @@ const MockData = (() => {
   const num = (v) => Number(v || 0);
 
   const seed = {
-    version: 3,
+    version: 4,
     settings: {
       shopName: 'Maztech Garage',
       ownerName: 'เอ',
@@ -45,6 +45,21 @@ const MockData = (() => {
         { id: 'KPAY', name: 'KBank-225', openingBalance: 99300 },
         { id: 'CASH', name: 'เงินสดหน้างาน', openingBalance: 0 },
       ],
+      dropdownMasters: {
+        jobStatuses: ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ','พร้อมส่งมอบ','ส่งมอบแล้ว','ยกเลิก'],
+        jobTypes: ['เช็กระยะ','เปลี่ยนถ่ายน้ำมันเครื่อง','ช่วงล่าง','เบรก','เครื่องยนต์','เกียร์','ระบบไฟฟ้า','ระบบแอร์','DPF / เขม่า','วิเคราะห์อาการ','งานแก้ / เคลม','อื่น ๆ'],
+        vehicleModels: [
+          'Mazda2 1.5 G','Mazda2 1.3 G','Mazda2 1.5 D','CX-3 2.0 G','CX-3 1.5 D','CX-30 2.0 G',
+          'Mazda3 2.0 G','Mazda3 BP','CX-5 2.0','CX-5 2.0 KF','CX-5 2.0 KE','CX-5 2.2 D',
+          'CX-5 2.2 KF','CX-5 2.2 KE','CX-8 G','CX-8 D','BT-50 MT','BT-50 AT'
+        ],
+        incomeCategories: ['รายรับ-ค่าซ่อม','รายรับ-ขายอะไหล่','รายรับ-ค่าตรวจเช็ก','รายรับ-มัดจำ','รายรับ-อื่น ๆ'],
+        expenseCategories: ['ต้นทุน-อะไหล่','ค่าแรงช่าง','ค่าเช่า','ค่าน้ำไฟ','ค่าวัสดุสิ้นเปลือง','ค่าเครื่องมือ','ค่าจ้างช่วง','ค่าโฆษณา','ค่าใช้จ่ายสำนักงาน','ค่าขนส่ง','ค่าใช้จ่ายอื่น ๆ'],
+        capitalCategories: ['เงินลงทุนหุ้นส่วน','ถอนเงินหุ้นส่วน','แบ่งกำไรหุ้นส่วน','เงินสำรองกิจการ'],
+        channels: ['โอน/QR','เงินสด','EDC/K SHOP','บัตรเครดิต','อื่น ๆ'],
+        partTypes: ['แท้','OEM','นอก','บริการ'],
+        suppliers: ['มาสด้าพระนคร','ร้านวอ','ลาดปลาเค้าอะไหล่','โอ้เซอร์วิส','shoppee','อะไหล่เบียร์','TEIN','HKS','ร้านอะไหล่ทั่วไป'],
+      },
       gasUrl: '',
     },
     customers: [
@@ -55,71 +70,71 @@ const MockData = (() => {
       { id: 'CUST-0005', name: 'คุณมานพ อ.', phone: '084-567-8901', line: '@manop', type: 'ลูกค้าประจำ', createdAt: '2026-04-15T09:00:00.000Z' },
     ],
     vehicles: [
-      { id: 'VH-0001', customerId: 'CUST-0001', plate: 'กข-1234', model: 'Mazda2 1.3E', year: '2019', mileage: 93000, color: 'ขาว', vin: 'MM7DJ2HAAKW000001' },
-      { id: 'VH-0002', customerId: 'CUST-0002', plate: 'ชม-5678', model: 'Mazda CX-5 2.0S (2021)', year: '2021', mileage: 82450, color: 'Polymetal Grey', vin: 'JMZKF5B44N0123456' },
-      { id: 'VH-0003', customerId: 'CUST-0003', plate: 'พบ-9012', model: 'Mazda3 2.0', year: '2020', mileage: 76800, color: 'แดง', vin: 'JMZBP5S0000000003' },
-      { id: 'VH-0004', customerId: 'CUST-0004', plate: 'สข-3456', model: 'CX-30 2.0', year: '2022', mileage: 51000, color: 'ดำ', vin: 'JMZDM000000000004' },
-      { id: 'VH-0005', customerId: 'CUST-0005', plate: 'กส-7890', model: 'Mazda2 1.5D', year: '2018', mileage: 120500, color: 'เทา', vin: 'MM7DL2S0000000005' },
+      { id: 'VH-0001', customerId: 'CUST-0001', plate: 'กข-1234', model: 'Mazda2 1.3 G', year: '2019', mileage: 93000, color: 'ขาว', vin: 'MM7DJ2HAAKW000001' },
+      { id: 'VH-0002', customerId: 'CUST-0002', plate: 'ชม-5678', model: 'CX-5 2.0 KF', year: '2021', mileage: 82450, color: 'Polymetal Grey', vin: 'JMZKF5B44N0123456' },
+      { id: 'VH-0003', customerId: 'CUST-0003', plate: 'พบ-9012', model: 'Mazda3 2.0 G', year: '2020', mileage: 76800, color: 'แดง', vin: 'JMZBP5S0000000003' },
+      { id: 'VH-0004', customerId: 'CUST-0004', plate: 'สข-3456', model: 'CX-30 2.0 G', year: '2022', mileage: 51000, color: 'ดำ', vin: 'JMZDM000000000004' },
+      { id: 'VH-0005', customerId: 'CUST-0005', plate: 'กส-7890', model: 'Mazda2 1.5 D', year: '2018', mileage: 120500, color: 'เทา', vin: 'MM7DL2S0000000005' },
     ],
     parts: [
-      { id: 'PART-0001', partNo: 'SH01-20303', name: 'DPF Filter Assembly CX-5', type: 'แท้', unit: 'ชิ้น', costUnit: 12400, sellUnit: 16800, stockQty: 1, minStock: 1, supplier: 'PSS' },
-      { id: 'PART-0002', partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', unit: 'ครั้ง', costUnit: 0, sellUnit: 800, stockQty: 99, minStock: 0, supplier: 'Maztech' },
-      { id: 'PART-0003', partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', unit: 'ลิตร', costUnit: 380, sellUnit: 480, stockQty: 20, minStock: 8, supplier: 'พระนคร เซลส์' },
-      { id: 'PART-0004', partNo: 'D10G-39070A', name: 'ยางแท่นเครื่อง', type: 'แท้', unit: 'ชิ้น', costUnit: 1850, sellUnit: 2600, stockQty: 2, minStock: 1, supplier: 'Wor Ladprao' },
-      { id: 'PART-0005', partNo: 'KE64-39060A', name: 'ยางแท่นเครื่อง CX-5', type: 'แท้', unit: 'ชิ้น', costUnit: 2450, sellUnit: 3400, stockQty: 1, minStock: 1, supplier: 'พระนคร เซลส์' },
-      { id: 'PART-0006', partNo: 'LABOR', name: 'ค่าแรงเหมาซ่อม', type: 'บริการ', unit: 'งาน', costUnit: 0, sellUnit: 8000, stockQty: 999, minStock: 0, supplier: 'Maztech' },
+      { id: 'PART-0001', partNo: 'SH01-20303', name: 'DPF Filter Assembly CX-5', type: 'แท้', unit: 'ชิ้น', costUnit: 12400, sellUnit: 16800, stockQty: 1, minStock: 1, supplier: 'ลาดปลาเค้าอะไหล่' },
+      { id: 'PART-0002', partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', unit: 'ครั้ง', costUnit: 0, sellUnit: 800, stockQty: 99, minStock: 0, supplier: 'โอ้เซอร์วิส' },
+      { id: 'PART-0003', partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', unit: 'ลิตร', costUnit: 380, sellUnit: 480, stockQty: 20, minStock: 8, supplier: 'มาสด้าพระนคร' },
+      { id: 'PART-0004', partNo: 'D10G-39070A', name: 'ยางแท่นเครื่อง', type: 'แท้', unit: 'ชิ้น', costUnit: 1850, sellUnit: 2600, stockQty: 2, minStock: 1, supplier: 'ร้านวอ' },
+      { id: 'PART-0005', partNo: 'KE64-39060A', name: 'ยางแท่นเครื่อง CX-5', type: 'แท้', unit: 'ชิ้น', costUnit: 2450, sellUnit: 3400, stockQty: 1, minStock: 1, supplier: 'มาสด้าพระนคร' },
+      { id: 'PART-0006', partNo: 'LABOR', name: 'ค่าแรงเหมาซ่อม', type: 'บริการ', unit: 'งาน', costUnit: 0, sellUnit: 8000, stockQty: 999, minStock: 0, supplier: 'โอ้เซอร์วิส' },
     ],
     jobs: [
       {
         id: 'MT-2604-0042', reNo: 'RE-260419-001', openDate: '2026-04-19', appointDate: '2026-04-22', daysOpen: 6,
         customerId: 'CUST-0001', vehicleId: 'VH-0001', customer: 'คุณวิชัย ท.', phone: '081-234-5678', line: '@wichai',
-        plate: 'กข-1234', model: 'Mazda2 1.3E', mileage: 93000, symptom: 'เครื่องสั่น ควันดำ', techNote: 'ตรวจพบเขม่าสะสมและหัวฉีดเริ่มสกปรก', internalNote: '',
+        plate: 'กข-1234', model: 'Mazda2 1.3 G', mileage: 93000, symptom: 'เครื่องสั่น ควันดำ', techNote: 'ตรวจพบเขม่าสะสมและหัวฉีดเริ่มสกปรก', internalNote: '',
         estimated: 15000, jobStatus: 'กำลังซ่อม', payStatus: 'มัดจำแล้ว', assignee: 'สุทธินนท์', technician: 'สุทธินนท์', urgency: 3,
         financials: { laborMain: 3500, laborExtra: 0, specialService: 800, discount: 500, vatRate: 0, deposit: 5000 },
         parts: [
-          { partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'พระนคร เซลส์' },
-          { partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', qty: 1, unit: 'ครั้ง', costUnit: 0, sellUnit: 800, supplier: 'Maztech' },
+          { partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'มาสด้าพระนคร' },
+          { partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', qty: 1, unit: 'ครั้ง', costUnit: 0, sellUnit: 800, supplier: 'โอ้เซอร์วิส' },
         ],
         timeline: [], notes: ['ลูกค้านัดรับ 22 เม.ย.'], createdAt: '2026-04-19T09:00:00.000Z', updatedAt: '2026-04-19T09:00:00.000Z'
       },
       {
         id: 'MT-2604-0041', reNo: 'RE-260418-001', openDate: '2026-04-18', appointDate: '2026-04-25', daysOpen: 7,
         customerId: 'CUST-0002', vehicleId: 'VH-0002', customer: 'คุณพรรณี สุขสม', phone: '089-876-5432', line: '@pannee_s',
-        plate: 'ชม-5678', model: 'Mazda CX-5 2.0S (2021)', mileage: 82450, symptom: 'DPF อุดตัน เตือน', techNote: 'DPF อุดตันระดับ 85% แนะนำเปลี่ยน/ล้าง และทำความสะอาด EGR', internalNote: 'อะไหล่ DPF สั่งจาก PSS อยู่ระหว่างรอส่ง',
+        plate: 'ชม-5678', model: 'CX-5 2.0 KF', mileage: 82450, symptom: 'DPF อุดตัน เตือน', techNote: 'DPF อุดตันระดับ 85% แนะนำเปลี่ยน/ล้าง และทำความสะอาด EGR', internalNote: 'อะไหล่ DPF สั่งจาก ลาดปลาเค้าอะไหล่ อยู่ระหว่างรอส่ง',
         estimated: 32000, jobStatus: 'รออะไหล่', payStatus: 'ค้างชำระ', assignee: 'ภควัต', technician: 'ภควัต', urgency: 4,
         financials: { laborMain: 3500, laborExtra: 0, specialService: 800, discount: 800, vatRate: 0.07, deposit: 5000 },
         parts: [
-          { partNo: 'SH01-20303', name: 'DPF Filter Assembly CX-5', type: 'แท้', qty: 1, unit: 'ชิ้น', costUnit: 12400, sellUnit: 16800, supplier: 'PSS' },
-          { partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', qty: 1, unit: 'ครั้ง', costUnit: 0, sellUnit: 800, supplier: 'Maztech' },
-          { partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'พระนคร เซลส์' },
+          { partNo: 'SH01-20303', name: 'DPF Filter Assembly CX-5', type: 'แท้', qty: 1, unit: 'ชิ้น', costUnit: 12400, sellUnit: 16800, supplier: 'ลาดปลาเค้าอะไหล่' },
+          { partNo: 'RF7W-20300', name: 'EGR Valve (ทำความสะอาด)', type: 'บริการ', qty: 1, unit: 'ครั้ง', costUnit: 0, sellUnit: 800, supplier: 'โอ้เซอร์วิส' },
+          { partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'มาสด้าพระนคร' },
         ],
         timeline: [], notes: ['แจ้งลูกค้าทาง LINE แล้ว'], createdAt: '2026-04-18T09:00:00.000Z', updatedAt: '2026-04-18T09:00:00.000Z'
       },
       {
         id: 'MT-2604-0040', reNo: 'RE-260417-001', openDate: '2026-04-17', appointDate: '2026-04-20', daysOpen: 3,
         customerId: 'CUST-0003', vehicleId: 'VH-0003', customer: 'คุณธนกร ว.', phone: '062-345-6789', line: '@thanakorn',
-        plate: 'พบ-9012', model: 'Mazda3 2.0', mileage: 76800, symptom: 'ช่วงล่างดัง เบรก', techNote: 'เปลี่ยนผ้าเบรกหน้าและตรวจช่วงล่าง', internalNote: '',
+        plate: 'พบ-9012', model: 'Mazda3 2.0 G', mileage: 76800, symptom: 'ช่วงล่างดัง เบรก', techNote: 'เปลี่ยนผ้าเบรกหน้าและตรวจช่วงล่าง', internalNote: '',
         estimated: 9000, jobStatus: 'พร้อมส่งมอบ', payStatus: 'ชำระครบ', assignee: 'อภิสิทธิ์', technician: 'อภิสิทธิ์', urgency: 2,
         financials: { laborMain: 1800, laborExtra: 0, specialService: 0, discount: 300, vatRate: 0, deposit: 8500 },
-        parts: [{ partNo: 'BRK-F', name: 'ผ้าเบรกหน้า Mazda3', type: 'OEM', qty: 1, unit: 'ชุด', costUnit: 2700, sellUnit: 4200, supplier: 'Wor Ladprao' }],
+        parts: [{ partNo: 'BRK-F', name: 'ผ้าเบรกหน้า Mazda3', type: 'OEM', qty: 1, unit: 'ชุด', costUnit: 2700, sellUnit: 4200, supplier: 'ร้านวอ' }],
         timeline: [], notes: [], createdAt: '2026-04-17T09:00:00.000Z', updatedAt: '2026-04-17T09:00:00.000Z'
       },
       {
         id: 'MT-2604-0039', reNo: 'RE-260416-001', openDate: '2026-04-16', appointDate: '2026-04-23', daysOpen: 7,
         customerId: 'CUST-0004', vehicleId: 'VH-0004', customer: 'คุณสมหญิง ล.', phone: '095-111-2222', line: '@somying',
-        plate: 'สข-3456', model: 'CX-30 2.0', mileage: 51000, symptom: 'เกียร์กระตุก ไม่ขึ้น', techNote: 'ตรวจเบื้องต้น รอทดสอบซ้ำ', internalNote: '',
+        plate: 'สข-3456', model: 'CX-30 2.0 G', mileage: 51000, symptom: 'เกียร์กระตุก ไม่ขึ้น', techNote: 'ตรวจเบื้องต้น รอทดสอบซ้ำ', internalNote: '',
         estimated: 45000, jobStatus: 'ตรวจซ้ำ', payStatus: 'ชำระบางส่วน', assignee: 'สุทธินนท์', technician: 'สุทธินนท์', urgency: 4,
         financials: { laborMain: 8000, laborExtra: 0, specialService: 0, discount: 1000, vatRate: 0, deposit: 20000 },
-        parts: [{ partNo: 'ATF-FZ', name: 'น้ำมันเกียร์ MAZDA ATF-FZ', type: 'แท้', qty: 5, unit: 'ลิตร', costUnit: 420, sellUnit: 620, supplier: 'พระนคร เซลส์' }],
+        parts: [{ partNo: 'ATF-FZ', name: 'น้ำมันเกียร์ MAZDA ATF-FZ', type: 'แท้', qty: 5, unit: 'ลิตร', costUnit: 420, sellUnit: 620, supplier: 'มาสด้าพระนคร' }],
         timeline: [], notes: [], createdAt: '2026-04-16T09:00:00.000Z', updatedAt: '2026-04-16T09:00:00.000Z'
       },
       {
         id: 'MT-2604-0038', reNo: 'RE-260415-001', openDate: '2026-04-15', appointDate: '', daysOpen: 1,
         customerId: 'CUST-0005', vehicleId: 'VH-0005', customer: 'คุณมานพ อ.', phone: '084-567-8901', line: '@manop',
-        plate: 'กส-7890', model: 'Mazda2 1.5D', mileage: 120500, symptom: 'เปลี่ยนน้ำมัน ฟิลเตอร์', techNote: 'เซอร์วิสตามระยะ', internalNote: '',
+        plate: 'กส-7890', model: 'Mazda2 1.5 D', mileage: 120500, symptom: 'เปลี่ยนน้ำมัน ฟิลเตอร์', techNote: 'เซอร์วิสตามระยะ', internalNote: '',
         estimated: 3500, jobStatus: 'ส่งมอบแล้ว', payStatus: 'ชำระครบ', assignee: 'ภควัต', technician: 'ภควัต', urgency: 1,
         financials: { laborMain: 600, laborExtra: 0, specialService: 0, discount: 0, vatRate: 0, deposit: 3200 },
-        parts: [{ partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'พระนคร เซลส์' }],
+        parts: [{ partNo: 'PE01-14302', name: 'น้ำมันเครื่อง Mazda Original 5W-30', type: 'แท้', qty: 4, unit: 'ลิตร', costUnit: 380, sellUnit: 480, supplier: 'มาสด้าพระนคร' }],
         timeline: [], notes: [], createdAt: '2026-04-15T09:00:00.000Z', updatedAt: '2026-04-15T09:00:00.000Z'
       }
     ],
@@ -180,6 +195,19 @@ const MockData = (() => {
         if (acc.id === 'KPAY' || acc.name === 'KBank-จ่าย') return { ...acc, name: 'KBank-225' };
         return acc;
       });
+    }
+
+    // Dropdown Master v4: รายการกลางสำหรับรุ่นรถและซัพพลายเออร์ตามที่อู่ใช้งานจริง
+    const defaultMasters = clone(seed.settings.dropdownMasters || {});
+    db.settings.dropdownMasters = db.settings.dropdownMasters || {};
+    Object.keys(defaultMasters).forEach(key => {
+      const current = Array.isArray(db.settings.dropdownMasters[key]) ? db.settings.dropdownMasters[key] : [];
+      const merged = [...defaultMasters[key], ...current.filter(x => !defaultMasters[key].includes(x))];
+      db.settings.dropdownMasters[key] = merged.filter(Boolean);
+    });
+    if (oldVersion < 4) {
+      db.settings.dropdownMasters.vehicleModels = clone(defaultMasters.vehicleModels);
+      db.settings.dropdownMasters.suppliers = clone(defaultMasters.suppliers);
     }
 
     ['customers','vehicles','parts','jobs','cashflow','audit'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
