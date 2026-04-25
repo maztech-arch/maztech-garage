@@ -50,6 +50,7 @@
   drawRevenueChart(revenue);
   drawCarsChart(cars);
   drawDonutChart(catData);
+  wireGlobalSearch();
 
   // ── Render recent jobs table ────────────────────────────
   const jobs = await MockData.getJobs();
@@ -66,7 +67,7 @@ function renderPageHeader(dash) {
         <div class="page-sub" id="today-date">ภาพรวมงานซ่อม รายรับรายจ่าย และสถานะงานวันนี้ — ${thaiDateToday().long}</div>
       </div>
       <div class="header-actions">
-        <a href="jobs.html?action=new" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
+        <a href="new-job.html" class="btn btn-primary">+ เปิดจ๊อบใหม่</a>
       </div>
     </div>`;
 }
@@ -191,7 +192,7 @@ function renderBottomRow(catData, alertData) {
           <div class="card-header">
             <div>
               <div class="card-title">สัดส่วนรายได้ตามหมวดงาน</div>
-              <div class="card-sub">เดือนมีนาคม 2568</div>
+              <div class="card-sub">เดือนปัจจุบัน</div>
             </div>
           </div>
           <div class="card-body">

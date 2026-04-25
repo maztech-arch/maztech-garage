@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>รับรถเข้า / เปิดจ๊อบ — Maztech Garage</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+<div class="app-shell" id="app"></div>
+<script>
+(async () => {
+  const settings = await MockData.getSettings();
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('new-job')}
+    <div class="main-area">
+      ${renderTopbar([{ label: 'Maztech Garage', href: 'dashboard.html' }, { label: 'รับรถเข้า / เปิดจ๊อบ' }])}
+      <main class="page-content">
+        <div class="page-header"><div><div class="page-title">รับรถเข้า / เปิดจ๊อบใหม่</div><div class="page-sub">กรอกข้อมูลครั้งเดียว ระบบจะสร้าง Job, ลูกค้า, รถ, รายรับมัดจำ และ Audit Log ให้อัตโนมัติ</div></div><div class="header-actions"><a class="btn btn-outline" href="jobs.html">← กลับรายการงาน</a></div></div>
+        <form class="card form-card" id="job-form">
+          <div class="card-header"><div class="card-title"><div class="card-icon" style="background:#dbeafe;">👤</div>ข้อมูลลูกค้าและรถ</div></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <label class="form-field"><span>ชื่อลูกค้า *</span><input name="name" required placeholder="เช่น คุณพรรณี" /></label>
+              <label class="form-field"><span>เบอร์โทร *</span><input name="phone" required placeholder="08x-xxx-xxxx" /></label>
+              <label class="form-field"><span>LINE / ช่องทางติดต่อ</span><input name="line" placeholder="@line หรือ Facebook" /></label>
+              <label class="form-field"><span>ประเภทลูกค้า</span><select name="type"><option>ลูกค้าทั่วไป</option><option>ลูกค้าประจำ</option><option>ลูกค้า VIP</option><option>ลูกค้าฟลีท</option></select></label>
+              <label class="form-field"><span>ทะเบียนรถ *</span><input name="plate" required placeholder="กข-1234" /></label>
+              <label class="form-field"><span>รุ่นรถ *</span><input name="model" required placeholder="Mazda2 / CX-5 / CX-30" /></label>
+              <label class="form-field"><span>เลขไมล์</span><input name="mileage" type="number" min="0" placeholder="85000" /></label>
+              <label class="form-field"><span>สีรถ</span><input name="color" placeholder="ขาว / เทา / แดง" /></label>
+              <label class="form-field full"><span>VIN / หมายเลขตัวถัง</span><input name="vin" placeholder="ถ้ามี" /></label>
+            </div>
+          </div>
+        </form>
+
+        <form class="card form-card" id="work-form">
+          <div class="card-header"><div class="card-title"><div class="card-icon" style="background:#fef3c7;">🔧</div>รายละเอียดงานซ่อม</div></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <label class="form-field"><span>วันที่รับรถ</span><input name="openDate" type="date" value="${App.todayISO()}" /></label>
+              <label class="form-field"><span>นัดรับรถ</span><input name="appointDate" type="date" /></label>
+              <label class="form-field"><span>สถานะเริ่มต้น</span><select name="jobStatus"><option>รับรถเข้า</option><option>ตรวจเช็ก</option><option>เสนอราคา</option><option>รออะไหล่</option><option>กำลังซ่อม</option></select></label>
+              <label class="form-field"><span>ผู้รับผิดชอบ</span><select name="assignee"><option>เอ</option><option>สุทธินนท์</option><option>ภควัต</option><option>อภิสิทธิ์</option></select></label>
+              <label class="form-field"><span>ความเร่งด่วน</span><select name="urgency"><option value="1">1 - ปกติ</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5 - เร่งด่วนมาก</option></select></label>
+              <label class="form-field"><span>ยอดประเมิน</span><input name="estimated" type="number" min="0" placeholder="15000" /></label>
+              <label class="form-field full"><span>อาการที่ลูกค้าแจ้ง *</span><textarea name="symptom" required rows="3" placeholder="เช่น เครื่องสั่น ควันดำ ไฟเตือนขึ้น"></textarea></label>
+              <label class="form-field full"><span>ผลตรวจเบื้องต้น / หมายเหตุช่าง</span><textarea name="techNote" rows="3" placeholder="กรอกภายหลังได้"></textarea></label>
+              <label class="form-field full"><span>หมายเหตุภายใน</span><textarea name="internalNote" rows="2" placeholder="ข้อมูลภายในอู่"></textarea></label>
+            </div>
+          </div>
+        </form>
+
+        <form class="card form-card" id="money-form">
+          <div class="card-header"><div class="card-title"><div class="card-icon" style="background:#d1fae5;">💳</div>ค่าแรง / มัดจำ</div></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <label class="form-field"><span>ค่าแรงหลัก</span><input name="laborMain" type="number" min="0" value="0" /></label>
+              <label class="form-field"><span>ค่าบริการพิเศษ</span><input name="specialService" type="number" min="0" value="0" /></label>
+              <label class="form-field"><span>ส่วนลด</span><input name="discount" type="number" min="0" value="0" /></label>
+              <label class="form-field"><span>รับมัดจำ</span><input name="deposit" type="number" min="0" value="0" /></label>
+              <label class="form-field"><span>เข้าบัญชี</span><select name="accountId">${settings.bankAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></label>
+              <label class="form-field"><span>ช่องทางรับเงิน</span><select name="channel"><option>โอน/QR</option><option>เงินสด</option><option>EDC/K SHOP</option></select></label>
+              <label class="form-field check-row"><input type="checkbox" name="useVat" /> <span>คิด VAT ตามค่าตั้งระบบ</span></label>
+            </div>
+          </div>
+        </form>
+
+        <div class="sticky-actions"><button class="btn btn-outline" onclick="history.back()">ยกเลิก</button><button class="btn btn-primary" id="save-job">บันทึกและเปิดจ๊อบ</button></div>
+      </main>
+    </div>`;
+  wireGlobalSearch();
+  document.getElementById('save-job').addEventListener('click', saveJob);
+})();
+
+function collectForms() {
+  const jf = document.getElementById('job-form');
+  const wf = document.getElementById('work-form');
+  const mf = document.getElementById('money-form');
+  if (!jf.reportValidity() || !wf.reportValidity() || !mf.reportValidity()) return null;
+  return {
+    customer: { name: formValue(jf, 'name'), phone: formValue(jf, 'phone'), line: formValue(jf, 'line'), type: formValue(jf, 'type') },
+    vehicle: { plate: formValue(jf, 'plate'), model: formValue(jf, 'model'), mileage: formNumber(jf, 'mileage'), color: formValue(jf, 'color'), vin: formValue(jf, 'vin') },
+    openDate: formValue(wf, 'openDate') || App.todayISO(),
+    appointDate: formValue(wf, 'appointDate'),
+    jobStatus: formValue(wf, 'jobStatus'),
+    assignee: formValue(wf, 'assignee'),
+    technician: formValue(wf, 'assignee'),
+    urgency: formNumber(wf, 'urgency', 2),
+    estimated: formNumber(wf, 'estimated'),
+    symptom: formValue(wf, 'symptom'),
+    techNote: formValue(wf, 'techNote'),
+    internalNote: formValue(wf, 'internalNote'),
+    laborMain: formNumber(mf, 'laborMain'),
+    specialService: formNumber(mf, 'specialService'),
+    discount: formNumber(mf, 'discount'),
+    deposit: formNumber(mf, 'deposit'),
+    accountId: formValue(mf, 'accountId'),
+    channel: formValue(mf, 'channel'),
+    useVat: mf.elements.useVat.checked,
+  };
+}
+
+function saveJob() {
+  const data = collectForms();
+  if (!data) return;
+  const job = MockData.createJob(data);
+  toast(`เปิดจ๊อบ ${job.id} เรียบร้อย`, 'success');
+  setTimeout(() => window.location.href = `job-detail.html?id=${encodeURIComponent(job.id)}`, 500);
+}
+</script>
+</body>
+</html>

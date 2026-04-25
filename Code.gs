@@ -1,191 +1,204 @@
 /**
- * app.js — Shared Utilities & Components
- * Maztech Garage Admin System
- * =========================================================
- * ฟังก์ชันกลางที่ทุกหน้าใช้ร่วมกัน
- * =========================================================
+ * Code.gs — Google Apps Script Backend Template for Maztech Garage
+ * ---------------------------------------------------------------
+ * เวอร์ชันนี้เตรียมไว้สำหรับเชื่อม GitHub Pages ↔ Google Sheets ภายหลัง
+ * Frontend เรียกด้วย action เช่น ?action=getJobs, ?action=getDashboard
+ *
+ * Sheet names ที่แนะนำ:
+ * Job_Header, Job_Detail, Parts_Master, Customer_Master, Vehicle_Master,
+ * Daily_Cashflow, Settings, Audit_Log
  */
 
-'use strict';
-
-// ── Number Formatting ──────────────────────────────────────
-const fmt = {
-  /** 521800 → "521,800" */
-  number: (n) => Math.round(n).toLocaleString('th-TH'),
-
-  /** 521800 → "฿521,800" */
-  baht: (n) => '฿' + Math.round(n).toLocaleString('th-TH'),
-
-  /** 0.581 → "58.1%" */
-  percent: (n) => n.toFixed(1) + '%',
-
-  /** "positive" / "negative" / "neutral" suffix for change indicators */
-  changeClass: (n) => n > 0 ? 'up' : n < 0 ? 'down' : 'neutral',
-
-  /** "+12.4%" or "-5.1%" */
-  changeText: (n) => (n > 0 ? '▲ ' : n < 0 ? '▼ ' : '') + Math.abs(n).toFixed(1) + '%',
+const SPREADSHEET_ID = 'PUT_YOUR_SPREADSHEET_ID_HERE';
+const DATA_ROW = {
+  JOB_HEADER: 4,
+  JOB_DETAIL: 4,
+  PARTS_MASTER: 4,
+  CUSTOMER_MASTER: 4,
+  VEHICLE_MASTER: 4,
+  CASHFLOW: 6,
+  SETTINGS: 2,
+  AUDIT_LOG: 2,
 };
 
-// ── Current Thai Buddhist Era Date ────────────────────────
-function thaiDateToday() {
-  const d   = new Date();
-  const day = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][d.getDay()];
-  const mon = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
-               'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()];
-  const be  = d.getFullYear() + 543;
-  const dayOfMonth = d.getDate();
-  // Short: "จ. 20 เม.ย. 2568"
-  const abbr = ['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'][d.getDay()];
+const SHEETS = {
+  JOB_HEADER: 'Job_Header',
+  JOB_DETAIL: 'Job_Detail',
+  PARTS_MASTER: 'Parts_Master',
+  CUSTOMER_MASTER: 'Customer_Master',
+  VEHICLE_MASTER: 'Vehicle_Master',
+  CASHFLOW: 'Daily_Cashflow',
+  SETTINGS: 'Settings',
+  AUDIT_LOG: 'Audit_Log',
+};
+
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) || 'ping';
+    const p = (e && e.parameter) || {};
+    const routes = {
+      ping: () => ({ ok: true, message: 'Maztech Garage API is ready', at: new Date().toISOString() }),
+      getJobs,
+      getJobSummary,
+      getJobDetail: () => getJobDetail(p.id),
+      getParts,
+      getCustomers,
+      getVehicles,
+      getCashflow,
+      getDashboard,
+      getMonthlyRevenue,
+      getMonthlyCars,
+      getRevenueCategory,
+      getAlerts,
+      getAudit,
+      getSettings,
+    };
+    if (!routes[action]) throw new Error('Unknown action: ' + action);
+    return jsonOut({ ok: true, data: routes[action]() });
+  } catch (err) {
+    return jsonOut({ ok: false, error: String(err && err.message ? err.message : err) });
+  }
+}
+
+function jsonOut(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function ss() {
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'PUT_YOUR_SPREADSHEET_ID_HERE') {
+    throw new Error('Please set SPREADSHEET_ID in Code.gs first.');
+  }
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+function sh(name) {
+  const sheet = ss().getSheetByName(name);
+  if (!sheet) throw new Error('Sheet not found: ' + name);
+  return sheet;
+}
+
+function readRows(sheetName, headerRow) {
+  const sheet = sh(sheetName);
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < headerRow || lastCol < 1) return [];
+  const values = sheet.getRange(headerRow, 1, lastRow - headerRow + 1, lastCol).getDisplayValues();
+  const headers = values.shift().map(h => String(h).trim());
+  return values
+    .filter(r => r.some(c => String(c).trim() !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { if (h) obj[h] = row[i]; });
+      return obj;
+    });
+}
+
+function n(v) {
+  return Number(String(v || '').replace(/[^0-9.-]/g, '')) || 0;
+}
+
+function normalizeJob(row) {
   return {
-    short: `${abbr} ${dayOfMonth} ${mon} ${be}`,
-    long:  `${day}ที่ ${dayOfMonth} ${mon} ${be}`,
+    id: row.Job_ID || row.job_id || row.ID || '',
+    reNo: row.RE_No || row.RE_NO || '',
+    date: row.Date || row.Open_Date || row['วันรับรถ'] || '',
+    openDate: row.Open_Date || row.Date || '',
+    appointDate: row.Appoint_Date || row['นัดรับรถ'] || '',
+    plate: row.Plate || row.License_Plate || row['ทะเบียน'] || '',
+    model: row.Model || row.Vehicle_Model || row['รุ่นรถ'] || '',
+    customer: row.Customer_Name || row.Customer || row['ลูกค้า'] || '',
+    phone: row.Phone || row['เบอร์โทร'] || '',
+    symptom: row.Symptom || row['อาการ'] || '',
+    estimated: n(row.Estimated || row['ยอดประเมิน']),
+    actual: n(row.Grand_Total || row.Actual || row['ยอดจริง']),
+    remaining: n(row.Remaining || row['ค้างชำระ']),
+    jobStatus: row.Job_Status || row.Status || row['สถานะงาน'] || 'รับรถเข้า',
+    payStatus: row.Pay_Status || row.Payment_Status || row['ชำระเงิน'] || 'ยังไม่ชำระ',
+    assignee: row.Assignee || row.Owner || row['ผู้รับผิดชอบ'] || '',
   };
 }
 
-// ── Badge HTML Helpers ─────────────────────────────────────
-const jobStatusBadge = {
-  'รับรถเข้า':       '<span class="badge badge-teal">รับรถเข้า</span>',
-  'ตรวจเช็ก':        '<span class="badge badge-teal">ตรวจเช็ก</span>',
-  'รออะไหล่':        '<span class="badge badge-blue">รออะไหล่</span>',
-  'กำลังซ่อม':       '<span class="badge badge-orange">กำลังซ่อม</span>',
-  'ตรวจซ้ำ':         '<span class="badge badge-purple">ตรวจซ้ำ</span>',
-  'พร้อมส่งมอบ':    '<span class="badge badge-green">พร้อมส่งมอบ</span>',
-  'ส่งมอบแล้ว':     '<span class="badge badge-gray">ส่งมอบแล้ว</span>',
-  'ยกเลิก':          '<span class="badge badge-red">ยกเลิก</span>',
-};
-
-const payStatusBadge = {
-  'ยังไม่ชำระ':      '<span class="badge badge-red">ยังไม่ชำระ</span>',
-  'มัดจำแล้ว':       '<span class="badge badge-yellow">มัดจำแล้ว</span>',
-  'ชำระบางส่วน':     '<span class="badge badge-yellow">ชำระบางส่วน</span>',
-  'ชำระครบ':         '<span class="badge badge-green">ชำระครบ</span>',
-  'ค้างชำระ':        '<span class="badge badge-red">ค้างชำระ</span>',
-};
-
-const partTypePill = {
-  'แท้':         '<span class="type-pill type-genuine">แท้</span>',
-  'OEM':         '<span class="type-pill type-oem">OEM</span>',
-  'นอก':         '<span class="type-pill type-aftermarket">นอก</span>',
-  'บริการ':      '<span class="type-pill type-service">บริการ</span>',
-};
-
-const alertColors = {
-  danger:  { dot: '#e24b4a', tag: 'background:#fee2e2;color:#991b1b;' },
-  warning: { dot: '#f59e0b', tag: 'background:#fef3c7;color:#92400e;' },
-  info:    { dot: '#1e6fc4', tag: 'background:#dbeafe;color:#1e40af;' },
-  success: { dot: '#059669', tag: 'background:#d1fae5;color:#065f46;' },
-};
-
-// ── Sidebar HTML (shared across all pages) ─────────────────
-function renderSidebar(activePage) {
-  const navItems = [
-    { id: 'dashboard',  icon: '📊', label: 'Dashboard',           href: 'dashboard.html' },
-    { id: 'jobs',       icon: '📋', label: 'งานซ่อมทั้งหมด',      href: 'jobs.html', badge: 13 },
-    { id: 'new-job',    icon: '➕', label: 'รับรถเข้า / เปิดจ๊อบ', href: '#' },
-    { section: 'คลัง & บัญชี' },
-    { id: 'parts',      icon: '📦', label: 'อะไหล่ / คลัง',       href: '#' },
-    { id: 'customers',  icon: '👥', label: 'ลูกค้า / รถ',          href: '#' },
-    { id: 'finance',    icon: '💳', label: 'รายรับ-รายจ่าย',      href: '#' },
-    { id: 'reports',    icon: '📑', label: 'รายงาน / Export',     href: '#' },
-    { section: 'ระบบ' },
-    { id: 'users',      icon: '👤', label: 'ผู้ใช้งาน / Role',    href: '#' },
-    { id: 'audit',      icon: '🔍', label: 'Audit Log',            href: '#' },
-    { id: 'settings',   icon: '⚙️', label: 'ตั้งค่าระบบ',         href: '#' },
-  ];
-
-  const items = navItems.map(item => {
-    if (item.section) {
-      return `<div class="nav-section">${item.section}</div>`;
-    }
-    const isActive = item.id === activePage ? 'active' : '';
-    const badge    = item.badge ? `<span class="nav-badge">${item.badge}</span>` : '';
-    return `
-      <a href="${item.href}" class="nav-item ${isActive}">
-        <span class="nav-icon">${item.icon}</span>
-        ${item.label}
-        ${badge}
-      </a>`;
-  }).join('');
-
-  return `
-    <aside class="sidebar">
-      <a href="dashboard.html" class="sidebar-logo">
-        <div class="logo-icon">MZ</div>
-        <div class="logo-title">Maztech Garage</div>
-        <div class="logo-sub">ระบบจัดการอู่ซ่อมรถ Mazda</div>
-      </a>
-      <nav class="sidebar-nav">${items}</nav>
-      <div class="sidebar-user">
-        <div class="user-avatar">เอ</div>
-        <div>
-          <div class="user-name">เอ · Owner</div>
-          <div class="user-role">MazTech Garage</div>
-        </div>
-      </div>
-    </aside>`;
+function getJobs() {
+  return readRows(SHEETS.JOB_HEADER, DATA_ROW.JOB_HEADER).map(normalizeJob);
 }
 
-// ── Topbar HTML ────────────────────────────────────────────
-function renderTopbar(breadcrumbs) {
-  const date  = thaiDateToday();
-  const crumbs = breadcrumbs.map((b, i) => {
-    const isLast = i === breadcrumbs.length - 1;
-    if (isLast) return `<span class="current">${b.label}</span>`;
-    const link = b.href ? `<a href="${b.href}" style="color:inherit;text-decoration:none;">${b.label}</a>` : b.label;
-    return `${link}<span class="sep">›</span>`;
-  }).join('');
-
-  return `
-    <header class="topbar">
-      <div class="breadcrumb">${crumbs}</div>
-      <div class="topbar-search">
-        <span class="search-icon">🔍</span>
-        <input type="text" placeholder="ค้นหาทะเบียน, ชื่อลูกค้า, Job No..." />
-      </div>
-      <div class="topbar-right">
-        <span class="date-badge">${date.short}</span>
-        <div class="icon-btn">🔔<div class="notif-dot"></div></div>
-        <div class="icon-btn">☀️</div>
-        <div class="icon-btn avatar-btn">เอ</div>
-      </div>
-    </header>`;
+function getJobSummary() {
+  const jobs = getJobs();
+  return {
+    total: jobs.length,
+    waitParts: jobs.filter(j => j.jobStatus === 'รออะไหล่').length,
+    inProgress: jobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ'].indexOf(j.jobStatus) >= 0).length,
+    readyDeliver: jobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ').length,
+    delivered: jobs.filter(j => j.jobStatus === 'ส่งมอบแล้ว').length,
+    arOverdue: jobs.filter(j => j.remaining > 0 && j.payStatus !== 'ชำระครบ').length,
+  };
 }
 
-// ── Chart.js defaults (Thai font) ─────────────────────────
-function chartDefaults() {
-  if (typeof Chart === 'undefined') return;
-  Chart.defaults.font.family = "'Sarabun', 'Noto Sans Thai', sans-serif";
-  Chart.defaults.font.size   = 11;
-  Chart.defaults.color       = '#64748b';
+function getJobDetail(id) {
+  const job = getJobs().filter(j => j.id === id)[0] || getJobs()[0];
+  if (!job) return null;
+  const partsRows = readRows(SHEETS.JOB_DETAIL, DATA_ROW.JOB_DETAIL).filter(r => (r.Job_ID || r.job_id) === job.id);
+  const parts = partsRows.map(r => ({
+    partNo: r.Part_No || r.PartNo || '',
+    name: r.Part_Name || r.Name || r['รายการ'] || '',
+    type: r.Type || r['ประเภท'] || 'แท้',
+    qty: n(r.Qty || r['จำนวน']),
+    unit: r.Unit || r['หน่วย'] || 'ชิ้น',
+    costUnit: n(r.Cost_Unit || r['ต้นทุน/หน่วย']),
+    sellUnit: n(r.Sell_Unit || r['ขาย/หน่วย']),
+    supplier: r.Supplier || '',
+  }));
+  return {
+    id: job.id,
+    reNo: job.reNo,
+    openDate: job.date,
+    appointDate: job.appointDate,
+    daysOpen: 0,
+    jobStatus: job.jobStatus,
+    payStatus: job.payStatus,
+    assignee: job.assignee,
+    technician: job.assignee,
+    urgency: 2,
+    customer: { name: job.customer, phone: job.phone, line: '', type: 'ลูกค้า' },
+    vehicle: { plate: job.plate, model: job.model, mileage: 0, color: '', vin: '', owner: job.customer },
+    symptoms: { customer: job.symptom, tech: '', internal: '' },
+    parts,
+    financials: { laborMain: n(job.actual), laborExtra: 0, specialService: 0, discount: 0, vatRate: 0, deposit: Math.max(0, n(job.actual) - n(job.remaining)) },
+    timeline: [],
+    history: [],
+  };
 }
 
-// ── GP% calculator ─────────────────────────────────────────
-function calcGP(costUnit, sellUnit, qty = 1) {
-  const cost = costUnit * qty;
-  const sell = sellUnit * qty;
-  if (sell === 0) return { cost, sell, gp: 0, gpPct: 0 };
-  const gp    = sell - cost;
-  const gpPct = (gp / sell) * 100;
-  return { cost, sell, gp, gpPct };
+function getParts() { return readRows(SHEETS.PARTS_MASTER, DATA_ROW.PARTS_MASTER); }
+function getCustomers() { return readRows(SHEETS.CUSTOMER_MASTER, DATA_ROW.CUSTOMER_MASTER); }
+function getVehicles() { return readRows(SHEETS.VEHICLE_MASTER, DATA_ROW.VEHICLE_MASTER); }
+function getCashflow() { return readRows(SHEETS.CASHFLOW, DATA_ROW.CASHFLOW); }
+function getAudit() { return readRows(SHEETS.AUDIT_LOG, DATA_ROW.AUDIT_LOG); }
+function getSettings() { return readRows(SHEETS.SETTINGS, DATA_ROW.SETTINGS); }
+
+function getDashboard() {
+  const jobs = getJobs();
+  const cf = getCashflow();
+  const revenue = cf.filter(r => String(r.Type || r.type || r['ประเภท']).indexOf('รับ') >= 0 || String(r.In || '').trim()).reduce((s, r) => s + n(r.Amount || r.In || r['รับเข้า']), 0);
+  const expense = cf.filter(r => String(r.Type || r.type || r['ประเภท']).indexOf('จ่าย') >= 0 || String(r.Out || '').trim()).reduce((s, r) => s + n(r.Amount || r.Out || r['จ่ายออก']), 0);
+  return {
+    cashBalance: revenue - expense,
+    revenueMonth: revenue,
+    expenseMonth: expense,
+    netProfitMonth: revenue - expense,
+    gpPercent: 0,
+    carsInProgress: jobs.filter(j => j.jobStatus !== 'ส่งมอบแล้ว').length,
+    carsWaitingParts: jobs.filter(j => j.jobStatus === 'รออะไหล่').length,
+    carsReadyToDeliver: jobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ').length,
+    arOverdue: jobs.reduce((s, j) => s + n(j.remaining), 0),
+    arOverdueCount: jobs.filter(j => n(j.remaining) > 0).length,
+    revenueChange: 0,
+    expenseChange: 0,
+    carsChange: 0,
+  };
 }
 
-// ── Financial totals for job detail ───────────────────────
-function calcFinancials(fin, parts) {
-  const partsTotal = parts.reduce((s, p) => s + p.sellUnit * p.qty, 0);
-  const subtotal   = partsTotal + fin.laborMain + fin.laborExtra + fin.specialService;
-  const afterDisc  = subtotal - fin.discount;
-  const vat        = Math.round(afterDisc * fin.vatRate);
-  const grand      = afterDisc + vat;
-  const remaining  = grand - fin.deposit;
-  return { partsTotal, subtotal, afterDisc, vat, grand, remaining };
-}
-
-// ── Urgency stars HTML ─────────────────────────────────────
-function renderUrgencyStars(level, max = 5) {
-  let html = '<div class="urgency-stars">';
-  for (let i = 1; i <= max; i++) {
-    html += i <= level ? '<span class="star-filled">★</span>' : '<span class="star-empty">☆</span>';
-  }
-  html += '</div>';
-  return html;
-}
+function getMonthlyRevenue() { return [{ month: 'เดือนนี้', revenue: getDashboard().revenueMonth, expense: getDashboard().expenseMonth }]; }
+function getMonthlyCars() { return [{ month: 'เดือนนี้', count: getJobs().length }]; }
+function getRevenueCategory() { return [{ label: 'รายรับรวม', percent: 100, color: '#1e6fc4' }]; }
+function getAlerts() { return [{ level: 'info', text: 'เชื่อมต่อ Apps Script แล้ว', tag: 'GAS' }]; }

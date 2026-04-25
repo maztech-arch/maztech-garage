@@ -834,3 +834,68 @@ input[type="checkbox"] { accent-color: var(--blue); cursor: pointer; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ==========================================================
+   MVP additions — Forms, Modals, Toasts, responsive polish
+   เพิ่มเฉพาะส่วนที่จำเป็นเพื่อให้เมนูและปุ่มใช้งานจริง
+   ========================================================== */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: linear-gradient(180deg, #0f2444 0%, #122b52 58%, #0b1b33 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-logo { display:block; padding:16px; text-decoration:none; border-bottom:1px solid rgba(255,255,255,0.08); }
+button.icon-btn { border:0; cursor:pointer; font-family:var(--font); }
+.muted-xs { font-size:10px; color:var(--muted); margin-top:2px; }
+.mono, .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.empty-state { text-align:center; color:var(--muted); padding:18px !important; }
+.form-card { overflow: visible; }
+.form-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px; }
+.form-field { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--label); }
+.form-field.full { grid-column:1 / -1; }
+.form-field span { font-weight:600; color:var(--heading); }
+.form-field input, .form-field select, .form-field textarea {
+  width:100%; border:1px solid var(--border); background:#fff; border-radius:var(--radius-md);
+  padding:8px 10px; font-family:var(--font); font-size:12px; color:var(--heading); outline:none;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(30,111,196,.1); }
+.check-row { flex-direction:row; align-items:center; gap:8px; }
+.check-row input { width:auto; }
+.sticky-actions { position:sticky; bottom:0; z-index:5; display:flex; justify-content:flex-end; gap:10px; padding:12px 0; background:linear-gradient(180deg, rgba(240,244,248,0), var(--bg) 34%); }
+.detail-layout { flex-direction: row !important; gap:14px !important; overflow:hidden !important; }
+.detail-main { overflow-y:auto; padding-right:2px; }
+.right-rail { overflow-y:auto; }
+.toast-wrap { position:fixed; right:18px; bottom:18px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+.toast { transform:translateY(10px); opacity:0; transition:.22s ease; min-width:220px; max-width:360px; padding:10px 12px; border-radius:10px; box-shadow:0 12px 28px rgba(15,36,68,.18); background:#fff; border-left:4px solid var(--blue); font-size:12px; color:var(--heading); }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast-success { border-left-color:var(--green); }
+.toast-warning { border-left-color:var(--amber); }
+.toast-error { border-left-color:var(--red); }
+.modal-backdrop { position:fixed; inset:0; background:rgba(15,36,68,.38); z-index:9998; display:flex; align-items:center; justify-content:center; padding:18px; }
+.modal-card { width:min(760px, 96vw); max-height:90vh; overflow:auto; background:#fff; border-radius:16px; box-shadow:0 18px 50px rgba(15,36,68,.28); }
+.modal-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); }
+.modal-title { font-weight:700; color:var(--heading); font-size:15px; }
+.modal-close { border:0; background:#f1f5f9; color:var(--label); width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:18px; line-height:1; }
+.modal-body { padding:16px; }
+.modal-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+.gp-negative { color:var(--red); font-weight:700; }
+.gp-positive, .positive { color:var(--green); font-weight:700; }
+.text-right { text-align:right; }
+@media print {
+  .sidebar, .topbar, .header-actions, .right-rail, .sticky-actions, .filter-panel, .bulk-bar { display:none !important; }
+  .app-shell, .main-area, .page-content, .detail-layout, .detail-main { display:block !important; height:auto !important; overflow:visible !important; }
+  body { background:#fff; }
+  .card { box-shadow:none !important; break-inside:avoid; }
+}
+@media (max-width: 980px) {
+  .app-shell { overflow:auto; height:auto; min-height:100vh; }
+  .sidebar { position:fixed; z-index:20; transform:translateX(-100%); }
+  .main-area { height:auto; min-height:100vh; }
+  .detail-layout { flex-direction:column !important; overflow:auto !important; }
+  .right-rail { width:100% !important; }
+  .form-grid { grid-template-columns:1fr; }
+  .topbar-search { display:none; }
+}
