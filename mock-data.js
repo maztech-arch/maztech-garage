@@ -7,7 +7,7 @@
 
 'use strict';
 
-const DATA_MODE = 'gas';
+const DATA_MODE = 'gas'; // 'local' = localStorage, 'gas' = Google Apps Script
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbw148DigdORg8qcOrutbrdt1vq5XYPnILpqbPOpaKKTiRToW7sH3KnrrL4CPUriaJYt/exec';
 const STORAGE_KEY = 'maztech_garage_mvp_v2';
 
@@ -256,11 +256,23 @@ const MockData = (() => {
 
   async function gasFetch(action, params = {}) {
     if (DATA_MODE !== 'gas' || !GAS_URL) return null;
-    const qs = new URLSearchParams({ action, ...params }).toString();
-    const res = await fetch(`${GAS_URL}?${qs}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'GAS error');
-    return json.data;
+    try {
+      const qs = new URLSearchParams({ action, ...params }).toString();
+      const res = await fetch(`${GAS_URL}?${qs}`, {
+        redirect: 'follow',
+        method: 'GET',
+        mode: 'cors',
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        console.warn('[GAS] error:', json.error);
+        return null; // fallback ไป localStorage
+      }
+      return json.data;
+    } catch (err) {
+      console.warn('[GAS] fetch failed:', err.message);
+      return null; // fallback ไป localStorage
+    }
   }
 
   function calcJobTotals(job) {
