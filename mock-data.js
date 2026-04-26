@@ -21,23 +21,23 @@ const MockData = (() => {
     version: 4,
     settings: {
       shopName: 'Maztech Garage',
-      ownerName: 'เอ',
+      ownerName: 'เอ (เจ้าของหุ้น 25%)',
       phone: '089-000-0000',
       address: 'กรุงเทพฯ',
       vatRate: 0.07,
       gpTarget: 35,
       reservePercent: 30,
       partners: [
-        { id: 'P001', name: 'โอ้', sharePercent: 25, status: 'Active' },
-        { id: 'P002', name: 'กาย', sharePercent: 25, status: 'Active' },
-        { id: 'P003', name: 'ออย', sharePercent: 25, status: 'Active' },
-        { id: 'P004', name: 'พงษ์', sharePercent: 25, status: 'Active' },
+        { id: 'P001', name: 'ออย', sharePercent: 25, status: 'Active' },
+        { id: 'P002', name: 'พงษ์', sharePercent: 25, status: 'Active' },
+        { id: 'P003', name: 'โอ้', sharePercent: 25, status: 'Active' },
+        { id: 'P004', name: 'กาย', sharePercent: 25, status: 'Active' },
       ],
       fixedExpenses: [
         { id: 'RENT', name: 'ค่าเช่า', amount: 35000 },
-        { id: 'SALARY_TECH_1', name: 'เงินเดือนช่างคนที่ 1', amount: 15000 },
-        { id: 'SALARY_TECH_2', name: 'เงินเดือนช่างคนที่ 2', amount: 15000 },
-        { id: 'SALARY_TECH_3', name: 'เงินเดือนช่างคนที่ 3', amount: 15000 },
+        { id: 'SALARY_TECH_1', name: 'เงินเดือนช่าง สุทธินนท์', amount: 15000 },
+        { id: 'SALARY_TECH_2', name: 'เงินเดือนช่าง ภควัต', amount: 15000 },
+        { id: 'SALARY_TECH_3', name: 'เงินเดือนช่าง อภิสิทธิ์', amount: 15000 },
         { id: 'UTILITIES', name: 'ค่าน้ำไฟ', amount: 3000 },
       ],
       bankAccounts: [
@@ -46,7 +46,7 @@ const MockData = (() => {
         { id: 'CASH', name: 'เงินสดหน้างาน', openingBalance: 0 },
       ],
       dropdownMasters: {
-        jobStatuses: ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ','พร้อมส่งมอบ','ส่งมอบแล้ว','ยกเลิก'],
+        jobStatuses: ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','รอชิ้นส่วน','กำลังซ่อม','ตรวจซ้ำ','เสร็จแล้ว','พร้อมส่งมอบ','ส่งมอบแล้ว','ยกเลิก'],
         jobTypes: ['เช็กระยะ','เปลี่ยนถ่ายน้ำมันเครื่อง','ช่วงล่าง','เบรก','เครื่องยนต์','เกียร์','ระบบไฟฟ้า','ระบบแอร์','DPF / เขม่า','วิเคราะห์อาการ','งานแก้ / เคลม','อื่น ๆ'],
         vehicleModels: [
           'Mazda2 1.5 G','Mazda2 1.3 G','Mazda2 1.5 D','CX-3 2.0 G','CX-3 1.5 D','CX-30 2.0 G',
@@ -352,8 +352,8 @@ const MockData = (() => {
 
   function repairHealth(db) {
     const activeJobs = db.jobs.filter(j => !['ส่งมอบแล้ว','ยกเลิก'].includes(j.jobStatus));
-    const waitingParts = activeJobs.filter(j => j.jobStatus === 'รออะไหล่');
-    const inProgress = activeJobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ'].includes(j.jobStatus));
+    const waitingParts = activeJobs.filter(j => j.jobStatus === 'รออะไหล่' || j.jobStatus === 'รอชิ้นส่วน');
+    const inProgress = activeJobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','รอชิ้นส่วน','กำลังซ่อม','ตรวจซ้ำ','เสร็จแล้ว'].includes(j.jobStatus));
     const readyToDeliver = activeJobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ');
     const overdue3Days = activeJobs.filter(j => Math.max(0, Math.round((Date.now() - new Date(j.openDate).getTime()) / 86400000)) > 3);
     const unpaidJobs = db.jobs.map(j => ({ job: j, totals: calcJobTotals(j) })).filter(x => x.totals.remaining > 0 && x.job.payStatus !== 'ชำระครบ');
@@ -430,7 +430,7 @@ const MockData = (() => {
     const activeJobs = db.jobs.filter(j => !['ส่งมอบแล้ว','ยกเลิก'].includes(j.jobStatus));
     const ready = db.jobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ').length;
     const wait = db.jobs.filter(j => j.jobStatus === 'รออะไหล่').length;
-    const inProgress = db.jobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ'].includes(j.jobStatus)).length;
+    const inProgress = db.jobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','รอชิ้นส่วน','กำลังซ่อม','ตรวจซ้ำ','เสร็จแล้ว'].includes(j.jobStatus)).length;
     const overdueJobs = db.jobs.map(j => ({ j, t: calcJobTotals(j) })).filter(x => x.t.remaining > 0 && x.j.payStatus !== 'ชำระครบ');
     const allJobTotals = db.jobs.map(calcJobTotals).filter(t => t.grand > 0);
     const grossSell = allJobTotals.reduce((s, t) => s + t.afterDisc, 0);
@@ -538,7 +538,7 @@ const MockData = (() => {
     return {
       total: db.jobs.length,
       waitParts: db.jobs.filter(j => j.jobStatus === 'รออะไหล่').length,
-      inProgress: db.jobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ'].includes(j.jobStatus)).length,
+      inProgress: db.jobs.filter(j => ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออนุมัติ','รออะไหล่','รอชิ้นส่วน','กำลังซ่อม','ตรวจซ้ำ','เสร็จแล้ว'].includes(j.jobStatus)).length,
       readyDeliver: db.jobs.filter(j => j.jobStatus === 'พร้อมส่งมอบ').length,
       delivered: db.jobs.filter(j => j.jobStatus === 'ส่งมอบแล้ว').length,
       arOverdue: db.jobs.filter(j => calcJobTotals(j).remaining > 0 && j.payStatus !== 'ชำระครบ').length,

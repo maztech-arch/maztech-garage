@@ -21,7 +21,10 @@ async function renderPage() {
   const jobId = params.get('id') || (jobs[0] && jobs[0].id);
   if (!jobId) return window.location.href = 'new-job.html';
   CURRENT_JOB = await MockData.getJobDetail(jobId);
-  const fin = calcFinancials(CURRENT_JOB.financials, CURRENT_JOB.parts);
+  // รองรับทั้ง GAS format (financials.totalSell) และ local format (parts array)
+  const fin = CURRENT_JOB.financials && CURRENT_JOB.financials.totalSell !== undefined
+    ? { partsTotal: CURRENT_JOB.financials.partsTotal || 0, partsCost: 0, grand: CURRENT_JOB.financials.totalSell || 0, vat: 0, remaining: 0, gp: CURRENT_JOB.financials.totalMargin || 0, gpPct: CURRENT_JOB.financials.marginPct || 0 }
+    : calcFinancials(CURRENT_JOB.financials, CURRENT_JOB.parts);
 
   document.getElementById('app').innerHTML = `
     ${renderSidebar('job-detail')}
@@ -76,28 +79,82 @@ function renderSymptomsSection(job) {
 }
 
 function renderPartsSection(job) {
-  const rows = (job.parts || []).map(p => { const g = calcGP(p.costUnit, p.sellUnit, p.qty); return `<tr>
-    <td class="font-mono" style="font-size:10px;">${App.esc(p.partNo)}</td><td>${App.esc(p.name)}</td><td>${partTypePill[p.type] || App.esc(p.type)}</td><td class="text-right">${fmt.number(p.qty)}</td><td class="text-right">${g.cost > 0 ? fmt.baht(p.costUnit) : '—'}</td><td class="text-right">${fmt.baht(p.sellUnit)}</td><td class="text-right">${g.cost > 0 ? fmt.baht(g.cost) : '—'}</td><td class="text-right">${fmt.baht(g.sell)}</td><td class="text-right ${g.gpPct < 20 ? 'gp-negative' : 'gp-positive'}">${fmt.percent(g.gpPct)}</td><td>${App.esc(p.supplier)}</td>
-  </tr>`; }).join('');
-  return `<div class="card table-wrap"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#d1fae5;">📦</div>รายการอะไหล่ / ค่าแรง</div><button class="btn btn-primary btn-sm" data-action="part">+ เพิ่มอะไหล่</button></div><table class="parts-table"><thead><tr><th>Part No</th><th>รายการ</th><th>ประเภท</th><th>จำนวน</th><th>ต้นทุน/หน่วย</th><th>ขาย/หน่วย</th><th>รวมต้นทุน</th><th>รวมขาย</th><th>GP%</th><th>Supplier</th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="empty-state">ยังไม่มีรายการอะไหล่</td></tr>'}</tbody></table></div>`;
+  // รองรับทั้ง local (parts array) และ GAS (services + parts แยกกัน)
+  const services = job.services || [];
+  const parts = job.parts || [];
+
+  // ถ้ามี services (มาจาก GAS) ให้แสดง services ก่อน แล้วตามด้วย parts
+  // ถ้าไม่มี services ให้แสดง parts อย่างเดียว (local mode)
+  let allRows = '';
+
+  if (services.length > 0) {
+    allRows += services.map(s => `<tr>
+      <td class="font-mono" style="font-size:10px;">${App.esc(s.code || '—')}</td>
+      <td>${App.esc(s.name)}</td>
+      <td>${App.esc(s.group || s.type || 'บริการ')}</td>
+      <td class="text-right">1</td>
+      <td class="text-right">${s.laborCost > 0 ? fmt.baht(s.laborCost) : '—'}</td>
+      <td class="text-right">${fmt.baht(s.sellPrice - s.discount)}</td>
+      <td class="text-right">${s.laborCost > 0 ? fmt.baht(s.laborCost) : '—'}</td>
+      <td class="text-right">${fmt.baht(s.sellPrice)}</td>
+      <td class="text-right ${(s.margin / Math.max(s.sellPrice,1) * 100) < 20 ? 'gp-negative' : 'gp-positive'}">${fmt.percent(s.sellPrice > 0 ? s.margin / s.sellPrice * 100 : 0)}</td>
+      <td>—</td>
+    </tr>`).join('');
+  }
+
+  if (parts.length > 0) {
+    allRows += parts.map(p => {
+      // GAS mode: lineSell/lineCost; local mode: sellUnit/costUnit * qty
+      const sellTotal = p.lineSell > 0 ? p.lineSell : (p.sellUnit || 0) * (p.qty || 1);
+      const costTotal = p.lineCost > 0 ? p.lineCost : (p.costUnit || 0) * (p.qty || 1);
+      const gpPct = sellTotal > 0 ? (sellTotal - costTotal) / sellTotal * 100 : 0;
+      return `<tr>
+        <td class="font-mono" style="font-size:10px;">${App.esc(p.partNo)}</td>
+        <td>${App.esc(p.name)}</td>
+        <td>${partTypePill[p.type] || App.esc(p.type || 'อะไหล่')}</td>
+        <td class="text-right">${fmt.number(p.qty || 1)}</td>
+        <td class="text-right">${costTotal > 0 ? fmt.baht(p.costUnit || (p.lineCost / Math.max(p.qty,1))) : '—'}</td>
+        <td class="text-right">${fmt.baht(p.sellUnit || (p.lineSell / Math.max(p.qty,1)))}</td>
+        <td class="text-right">${costTotal > 0 ? fmt.baht(costTotal) : '—'}</td>
+        <td class="text-right">${fmt.baht(sellTotal)}</td>
+        <td class="text-right ${gpPct < 20 ? 'gp-negative' : 'gp-positive'}">${fmt.percent(gpPct)}</td>
+        <td>${App.esc(p.supplier || '—')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  if (!allRows) {
+    allRows = '<tr><td colspan="10" class="empty-state">ยังไม่มีรายการอะไหล่ / บริการ</td></tr>';
+  }
+
+  return `<div class="card table-wrap"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#d1fae5;">📦</div>รายการงานซ่อม / อะไหล่</div><button class="btn btn-primary btn-sm" data-action="part">+ เพิ่มรายการ</button></div><table class="parts-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>ประเภท</th><th>จำนวน</th><th>ต้นทุน/หน่วย</th><th>ขาย/หน่วย</th><th>รวมต้นทุน</th><th>รวมขาย</th><th>GP%</th><th>Supplier</th></tr></thead><tbody>${allRows}</tbody></table></div>`;
+}
 }
 
 function renderFinancialsAndHistory(job, fin) {
   const f = job.financials || {};
+  // รองรับ GAS format (totalSell, partsTotal, laborMain, totalMargin, marginPct)
+  // และ local format (grand, partsTotal, gp, gpPct)
+  const isGasFormat = f.totalSell !== undefined;
+  const displayTotal = isGasFormat ? f.totalSell : fin.grand;
+  const displayParts = isGasFormat ? f.partsTotal : fin.partsTotal;
+  const displayLabor = f.laborMain || 0;
+  const displayMargin = isGasFormat ? f.totalMargin : fin.gp;
+  const displayMarginPct = isGasFormat ? f.marginPct : fin.gpPct;
+
   const historyRows = (job.history || []).map(h => `<tr><td><a href="job-detail.html?id=${h.jobId}" class="job-no">${h.jobId}</a></td><td>${h.date}</td><td>${App.esc(h.work)}</td><td>${fmt.baht(h.amount)}</td><td>${jobStatusBadge[h.status] || h.status}</td></tr>`).join('');
   return `<div class="two-col-grid"><div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#ede9fe;">💳</div>สรุปค่าใช้จ่าย</div></div><div class="card-body"><div class="fin-section">
-    <div class="fin-row"><span class="fin-key">อะไหล่รวม</span><span class="fin-val">${fmt.baht(fin.partsTotal)}</span></div>
-    <div class="fin-row"><span class="fin-key">ต้นทุนอะไหล่</span><span class="fin-val">${fmt.baht(fin.partsCost)}</span></div>
-    <div class="fin-row"><span class="fin-key">ค่าแรงช่าง</span><span class="fin-val">${fmt.baht(f.laborMain)}</span></div>
-    <div class="fin-row"><span class="fin-key">ค่าบริการพิเศษ</span><span class="fin-val">${fmt.baht(f.specialService)}</span></div>
+    <div class="fin-row"><span class="fin-key">ต้นทุนอะไหล่</span><span class="fin-val">${fmt.baht(displayParts)}</span></div>
+    <div class="fin-row"><span class="fin-key">ค่าแรง</span><span class="fin-val">${fmt.baht(displayLabor)}</span></div>
+    ${!isGasFormat ? `<div class="fin-row"><span class="fin-key">ค่าบริการพิเศษ</span><span class="fin-val">${fmt.baht(f.specialService)}</span></div>
     <div class="fin-row"><span class="fin-key">ส่วนลด</span><span class="fin-val positive">- ${fmt.baht(f.discount)}</span></div>
-    <div class="fin-row"><span class="fin-key">VAT ${((f.vatRate || 0) * 100).toFixed(0)}%</span><span class="fin-val">${fmt.baht(fin.vat)}</span></div>
-    <div class="fin-row" style="border-top:1px solid #e8edf2;padding-top:8px;margin-top:4px;"><span class="fin-key" style="font-weight:600;color:var(--heading);">ยอดรวมสุทธิ</span><span class="fin-val total">${fmt.baht(fin.grand)}</span></div>
-    <div class="fin-row"><span class="fin-key">รับชำระแล้ว</span><span class="fin-val positive">- ${fmt.baht(f.deposit)}</span></div>
-    <div class="fin-row"><span class="fin-key remaining">คงเหลือต้องชำระ</span><span class="fin-val remaining">${fmt.baht(fin.remaining)}</span></div>
-    <div class="fin-row"><span class="fin-key">GP โดยประมาณ</span><span class="fin-val ${fin.gpPct < 20 ? 'text-red' : 'positive'}">${fmt.baht(fin.gp)} (${fmt.percent(fin.gpPct)})</span></div>
+    <div class="fin-row"><span class="fin-key">VAT ${((f.vatRate || 0) * 100).toFixed(0)}%</span><span class="fin-val">${fmt.baht(fin.vat)}</span></div>` : ''}
+    <div class="fin-row" style="border-top:1px solid #e8edf2;padding-top:8px;margin-top:4px;"><span class="fin-key" style="font-weight:600;color:var(--heading);">ยอดรวมสุทธิ</span><span class="fin-val total">${fmt.baht(displayTotal)}</span></div>
+    ${!isGasFormat ? `<div class="fin-row"><span class="fin-key">รับชำระแล้ว</span><span class="fin-val positive">- ${fmt.baht(f.deposit)}</span></div>
+    <div class="fin-row"><span class="fin-key remaining">คงเหลือต้องชำระ</span><span class="fin-val remaining">${fmt.baht(fin.remaining)}</span></div>` : ''}
+    <div class="fin-row"><span class="fin-key">กำไร (Margin)</span><span class="fin-val ${displayMarginPct < 20 ? 'text-red' : 'positive'}">${fmt.baht(displayMargin)} (${fmt.percent(displayMarginPct)})</span></div>
   </div></div></div>
-  <div class="card table-wrap"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#ccfbf1;">📋</div>ประวัติซ่อมย้อนหลัง</div></div><table class="history-table"><thead><tr><th>Job No</th><th>วันที่</th><th>งานที่ทำ</th><th>ยอด</th><th>สถานะ</th></tr></thead><tbody>${historyRows || '<tr><td colspan="5" class="empty-state">ยังไม่มีประวัติย้อนหลัง</td></tr>'}</tbody></table></div></div>`;
+  <div class="card table-wrap"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#ccfbf1;">📋</div>ประวัติซ่อมย้อนหลัง (ทะเบียนเดียวกัน)</div></div><table class="history-table"><thead><tr><th>Job No</th><th>วันที่</th><th>งานที่ทำ</th><th>ยอด</th><th>สถานะ</th></tr></thead><tbody>${historyRows || '<tr><td colspan="5" class="empty-state">ยังไม่มีประวัติย้อนหลัง</td></tr>'}</tbody></table></div></div>`;
 }
 
 function renderRightRail(job, fin) {
@@ -140,14 +197,16 @@ function openEditModal() {
 }
 
 function openStatusModal() {
-  const opts = ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออะไหล่','กำลังซ่อม','ตรวจซ้ำ','พร้อมส่งมอบ','ส่งมอบแล้ว','ยกเลิก'];
+  const opts = ['รับรถเข้า','ตรวจเช็ก','เสนอราคา','รออะไหล่','รอชิ้นส่วน','กำลังซ่อม','ตรวจซ้ำ','เสร็จแล้ว','พร้อมส่งมอบ','ส่งมอบแล้ว','ยกเลิก'];
   openModal('เปลี่ยนสถานะ', `<label class="form-field"><span>สถานะใหม่</span><select id="new-status">${opts.map(o => `<option ${o === CURRENT_JOB.jobStatus ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`, `<button class="btn btn-outline" data-close-modal>ยกเลิก</button><button class="btn btn-primary" id="save-status">บันทึก</button>`);
   document.getElementById('save-status').onclick = async () => { MockData.updateJobStatus(CURRENT_JOB.id, document.getElementById('new-status').value); toast('เปลี่ยนสถานะแล้ว', 'success'); closeModal(); await renderPage(); };
 }
 
 async function openPaymentModal() {
   const settings = await MockData.getSettings();
-  const fin = calcFinancials(CURRENT_JOB.financials, CURRENT_JOB.parts);
+  const fin = CURRENT_JOB.financials && CURRENT_JOB.financials.totalSell !== undefined
+    ? { remaining: 0, grand: CURRENT_JOB.financials.totalSell }
+    : calcFinancials(CURRENT_JOB.financials, CURRENT_JOB.parts);
   openModal('บันทึกรับชำระ', `<form id="pay-form" class="form-grid"><label class="form-field"><span>ยอดรับชำระ</span><input name="amount" type="number" value="${fin.remaining}" /></label><label class="form-field"><span>เข้าบัญชี</span><select name="accountId">${settings.bankAccounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></label><label class="form-field"><span>ช่องทาง</span><select name="channel">${selectOptions(masterList(settings, 'channels'), 'โอน/QR')}</select></label></form>`, `<button class="btn btn-outline" data-close-modal>ยกเลิก</button><button class="btn btn-primary" id="save-payment">บันทึก</button>`);
   document.getElementById('save-payment').onclick = async () => { const f = document.getElementById('pay-form'); MockData.savePayment(CURRENT_JOB.id, formNumber(f,'amount'), formValue(f,'accountId'), formValue(f,'channel')); toast('บันทึกรับชำระแล้ว', 'success'); closeModal(); await renderPage(); };
 }
