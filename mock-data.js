@@ -7,8 +7,8 @@
 
 'use strict';
 
-const DATA_MODE = 'local'; // 'local' = localStorage, 'gas' = Google Apps Script
-const GAS_URL = '';        // ใส่ URL /exec เมื่อ Deploy Apps Script แล้ว
+const DATA_MODE = 'gas'; // 'local' = localStorage, 'gas' = Google Apps Script
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw148DigdORg8qcOrutbrdt1vq5XYPnILpqbPOpaKKTiRToW7sH3KnrrL4CPUriaJYt/exec';
 const STORAGE_KEY = 'maztech_garage_mvp_v2';
 
 const MockData = (() => {
